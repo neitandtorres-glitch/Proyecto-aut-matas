@@ -1,0 +1,2904 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simulador Jerarquía de Chomsky — Modelos Computacionales (Niveles 3, 2, 1 y 0)</title>
+  <!-- Carga de Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Fuente Inter y JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <script>
+    // Configuración de Tailwind CSS con paleta técnica/académica sobria y de alto contraste
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            slate950: '#0b1120',
+            slate900: '#0f172a',
+            slate850: '#162033',
+            academicBlue: '#1d4ed8',
+            academicTeal: '#0f766e',
+            academicAmber: '#b45309',
+            academicRose: '#be123c',
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* Estilos base y animaciones suaves para los modelos computacionales */
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+      overflow-x: hidden;
+    }
+
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Scrollbar discreta y elegante */
+    ::-webkit-scrollbar {
+      width: 7px;
+      height: 7px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    @keyframes pulseRing {
+      0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.45); }
+      70% { box-shadow: 0 0 0 8px rgba(37, 99, 235, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+    }
+
+    .active-state-ring {
+      animation: pulseRing 1.7s infinite;
+    }
+
+    @keyframes stackPopIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.96);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .stack-item-enter {
+      animation: stackPopIn 0.22s ease-out forwards;
+    }
+
+    @keyframes headBlink {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-3px); }
+    }
+
+    .tape-head-bob {
+      animation: headBlink 1.1s ease-in-out infinite;
+    }
+
+    /* Evitar desbordamientos en celdas de cinta */
+    .tape-cell {
+      transition: all 0.18s ease;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-50 text-slate-900">
+
+  <!-- ENCABEZADO SUPERIOR ACADÉMICO -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div class="flex items-start sm:items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-400/40 flex items-center justify-center shrink-0">
+          <!-- Icono SVG de autómatas / jerarquía formal -->
+          <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <h1 class="text-lg sm:text-xl font-bold tracking-tight text-white">
+              Laboratorio de Jerarquía de Chomsky
+            </h1>
+            <span class="text-xs font-mono px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-400/30">
+              Teoría de la Computación
+            </span>
+          </div>
+          <p class="text-xs sm:text-sm text-slate-300">
+            Simulación visual paso a paso de modelos formales: AFD (Nivel 3), AP / LIFO (Nivel 2), LBA (Nivel 1) y MT (Nivel 0)
+          </p>
+        </div>
+      </div>
+
+      <!-- Indicador rápido de nivel activo -->
+      <div class="flex items-center gap-2 self-start md:self-auto bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-1.5 text-xs">
+        <span class="text-slate-400">Modelo activo:</span>
+        <span id="header-active-badge" class="font-semibold text-blue-300 mono">Nivel 3 · AFD</span>
+      </div>
+    </div>
+
+    <!-- PANEL PRINCIPAL DE NAVEGACIÓN ENTRE NIVELES -->
+    <nav aria-label="Niveles de la Jerarquía de Chomsky" class="bg-slate-950/90 border-t border-slate-800/80">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5" id="chomsky-nav">
+          <button
+            type="button"
+            data-level="3"
+            class="nav-level-btn group text-left p-3 rounded-xl border transition-all duration-150 flex items-center justify-between gap-2 bg-blue-600 text-white border-blue-500 shadow-sm"
+          >
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-white/15 text-white">NIVEL 3</span>
+                <span class="font-semibold text-sm">Lenguajes Regulares</span>
+              </div>
+              <p class="text-xs text-blue-100 mt-1">Autómata Finito Determinista (AFD)</p>
+            </div>
+            <svg class="w-4 h-4 shrink-0 opacity-90" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+
+          <button
+            type="button"
+            data-level="2"
+            class="nav-level-btn group text-left p-3 rounded-xl border transition-all duration-150 flex items-center justify-between gap-2 bg-slate-900/80 hover:bg-slate-800 text-slate-200 border-slate-700/80"
+          >
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 border border-teal-500/30">NIVEL 2</span>
+                <span class="font-semibold text-sm">Libres de Contexto</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1">Autómata de Pila (AP · Memoria LIFO)</p>
+            </div>
+            <svg class="w-4 h-4 shrink-0 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+
+          <button
+            type="button"
+            data-level="1"
+            class="nav-level-btn group text-left p-3 rounded-xl border transition-all duration-150 flex items-center justify-between gap-2 bg-slate-900/80 hover:bg-slate-800 text-slate-200 border-slate-700/80"
+          >
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">NIVEL 1</span>
+                <span class="font-semibold text-sm">Sensibles al Contexto</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1">Autómata Linealmente Acotado (LBA)</p>
+            </div>
+            <svg class="w-4 h-4 shrink-0 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+
+          <button
+            type="button"
+            data-level="0"
+            class="nav-level-btn group text-left p-3 rounded-xl border transition-all duration-150 flex items-center justify-between gap-2 bg-slate-900/80 hover:bg-slate-800 text-slate-200 border-slate-700/80"
+          >
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">NIVEL 0</span>
+                <span class="font-semibold text-sm">Recursivamente Enumerables</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1">Máquina de Turing (Aceptación y Cálculo)</p>
+            </div>
+            <svg class="w-4 h-4 shrink-0 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <!-- BANNER DE NOTIFICACIONES / MENSAJES (SIN alert()) -->
+  <div id="toast-banner" class="hidden max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+    <div id="toast-inner" class="rounded-xl px-4 py-3 text-sm font-medium flex items-center justify-between gap-3 border shadow-sm">
+      <span id="toast-message"></span>
+      <button type="button" id="toast-close" class="text-xs font-semibold underline opacity-80 hover:opacity-100">Cerrar</button>
+    </div>
+  </div>
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- ===================================================================== -->
+    <!-- MÓDULO NIVEL 3: LENGUAJES REGULARES (AFD)                            -->
+    <!-- ===================================================================== -->
+    <section id="module-3" class="chomsky-module space-y-6">
+      <!-- Encabezado y teoría formal del Nivel 3 -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-sm">
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+          <div class="space-y-2 max-w-3xl">
+            <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+              <span>Nivel 3 · Gramática Regular (Tipo 3)</span>
+              <span>·</span>
+              <span>Autómata Finito Determinista (AFD)</span>
+            </div>
+            <h2 class="text-xl sm:text-2xl font-bold text-slate-900">
+              Reconocimiento de Lenguajes Regulares con AFD
+            </h2>
+            <p class="text-sm text-slate-600 leading-relaxed">
+              Un AFD se define como la quíntupla <span class="mono font-semibold text-slate-800">M = (Q, Σ, δ, q₀, F)</span>.
+              Carece de memoria auxiliar más allá de su estado actual en <span class="mono">Q</span>.
+              Puedes usar lenguajes regulares predeterminados o configurar libremente estados, alfabeto, estado inicial, estados finales y transiciones.
+            </p>
+          </div>
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs space-y-1.5 shrink-0 lg:w-72">
+            <div class="font-semibold text-slate-800 uppercase tracking-wider text-[11px]">Regla Formal de Aceptación</div>
+            <p class="text-slate-600">
+              Tras consumir todos los símbolos de <span class="mono font-semibold">w ∈ Σ*</span>, la cadena es <span class="text-emerald-700 font-semibold">ACEPTADA</span> si y solo si <span class="mono font-semibold">δ*(q₀, w) ∈ F</span>.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Selector de Autómata Predefinido + Editor Parametrizable -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Columna izquierda: Presets y Configuración Parametrizable del AFD -->
+        <div class="lg:col-span-5 space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="font-bold text-slate-900 text-base">1. Lenguaje Regular o AFD Parametrizable</h3>
+              <button type="button" id="dfa-toggle-editor" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition">
+                Editar Parámetros (Q, Σ, δ, F)
+              </button>
+            </div>
+
+            <!-- Presets de AFD -->
+            <div class="space-y-2">
+              <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500">Presets Predeterminados</label>
+              <div class="grid grid-cols-1 gap-2" id="dfa-presets-container"></div>
+            </div>
+
+            <!-- Descripción del AFD activo -->
+            <div id="dfa-active-summary" class="rounded-xl bg-slate-50 border border-slate-200 p-3.5 text-xs space-y-1.5"></div>
+
+            <!-- Editor Parametrizable colapsable -->
+            <div id="dfa-editor-panel" class="hidden pt-3 border-t border-slate-200 space-y-3">
+              <div class="text-xs font-bold text-blue-800 uppercase tracking-wider">
+                Configuración Personalizada del AFD
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">
+                  Estados <span class="mono">(Q, separados por coma)</span>
+                </label>
+                <input id="dfa-edit-states" type="text" class="w-full px-3 py-2 text-xs mono rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-slate-700 mb-1">
+                    Alfabeto <span class="mono">(Σ, coma)</span>
+                  </label>
+                  <input id="dfa-edit-alphabet" type="text" class="w-full px-3 py-2 text-xs mono rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-700 mb-1">
+                    Estado Inicial <span class="mono">(q₀)</span>
+                  </label>
+                  <input id="dfa-edit-start" type="text" class="w-full px-3 py-2 text-xs mono rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">
+                  Estados de Aceptación <span class="mono">(F, separados por coma)</span>
+                </label>
+                <input id="dfa-edit-accept" type="text" class="w-full px-3 py-2 text-xs mono rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-slate-700 mb-1">
+                  Función de Transición <span class="mono">δ(estado, símbolo) = destino</span> (una regla por línea: <span class="mono">q0,0->q1</span>)
+                </label>
+                <textarea id="dfa-edit-transitions" rows="5" class="w-full px-3 py-2 text-xs mono rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"></textarea>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <button type="button" id="dfa-apply-custom" class="flex-1 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition shadow-sm">
+                  Aplicar AFD Personalizado
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cadenas de prueba y entrada libre -->
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+            <h3 class="font-bold text-slate-900 text-base">2. Cadena de Entrada y Pruebas</h3>
+
+            <div>
+              <label for="dfa-input-string" class="block text-xs font-semibold text-slate-600 mb-1.5">
+                Cadena a evaluar (vacía = ε)
+              </label>
+              <div class="flex gap-2">
+                <input
+                  id="dfa-input-string"
+                  type="text"
+                  placeholder="Ej. 10101"
+                  class="flex-1 px-3.5 py-2.5 text-sm mono rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                />
+                <button type="button" id="dfa-load-btn" class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition">
+                  Cargar
+                </button>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <div class="text-xs font-semibold uppercase tracking-wider text-slate-500">Cadenas de Prueba (Clic para cargar y preparar)</div>
+              <div id="dfa-sample-strings" class="flex flex-wrap gap-2"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Columna derecha: Visualización de Estados, Controles y Traza -->
+        <div class="lg:col-span-7 space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-5">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 class="font-bold text-slate-900 text-base">3. Simulación Paso a Paso del AFD</h3>
+                <p class="text-xs text-slate-500">Observa el estado activo, el símbolo en lectura y el veredicto final</p>
+              </div>
+              <div id="dfa-verdict-badge" class="px-3 py-1 rounded-full text-xs font-bold border bg-slate-100 text-slate-700 border-slate-300">
+                Listo para simular
+              </div>
+            </div>
+
+            <!-- Cinta de símbolos de entrada -->
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+              <div class="flex items-center justify-between text-xs text-slate-500 mb-2">
+                <span class="font-semibold">Cinta de Entrada</span>
+                <span id="dfa-step-counter" class="mono font-semibold text-slate-700">Paso 0 / 0</span>
+              </div>
+              <div id="dfa-tape-view" class="flex flex-wrap items-center gap-1.5 min-h-[48px]"></div>
+            </div>
+
+            <!-- Diagrama visual de estados y transiciones -->
+            <div class="space-y-2">
+              <div class="flex items-center justify-between text-xs text-slate-500">
+                <span class="font-semibold uppercase tracking-wider">Estados del Autómata (Q)</span>
+                <div class="flex items-center gap-3">
+                  <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block"></span> Estado actual</span>
+                  <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full border-2 border-emerald-600 inline-block"></span> Aceptación (F)</span>
+                </div>
+              </div>
+              <div id="dfa-states-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pt-1"></div>
+            </div>
+
+            <!-- Última transición aplicada -->
+            <div id="dfa-last-transition" class="rounded-xl bg-blue-50/70 border border-blue-200/80 px-4 py-2.5 text-xs mono text-blue-950">
+              Esperando inicio de simulación...
+            </div>
+
+            <!-- Controles de reproducción -->
+            <div class="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+              <div class="flex flex-wrap items-center gap-2">
+                <button type="button" id="dfa-step-btn" class="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition shadow-sm">
+                  Paso siguiente
+                </button>
+                <button type="button" id="dfa-play-btn" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition shadow-sm">
+                  Reproducir
+                </button>
+                <button type="button" id="dfa-run-all-btn" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold transition">
+                  Evaluar directo
+                </button>
+                <button type="button" id="dfa-reset-btn" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold border border-slate-300 transition">
+                  Reiniciar
+                </button>
+              </div>
+
+              <div class="flex items-center gap-2 text-xs text-slate-600">
+                <label for="dfa-speed" class="font-medium">Velocidad:</label>
+                <select id="dfa-speed" class="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-medium outline-none">
+                  <option value="1100">Lenta (1.1s)</option>
+                  <option value="650" selected>Normal (0.65s)</option>
+                  <option value="250">Rápida (0.25s)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Tabla de transiciones del AFD -->
+            <div class="space-y-2">
+              <div class="text-xs font-semibold uppercase tracking-wider text-slate-500">Tabla de Transiciones δ(q, a)</div>
+              <div id="dfa-transition-table" class="overflow-x-auto rounded-xl border border-slate-200"></div>
+            </div>
+
+            <!-- Log / Traza de ejecución -->
+            <div class="space-y-2">
+              <div class="text-xs font-semibold uppercase tracking-wider text-slate-500">Traza de Transiciones</div>
+              <div id="dfa-trace-log" class="max-h-48 overflow-y-auto rounded-xl bg-slate-950 text-slate-100 p-3.5 text-xs mono space-y-1.5">
+                <div class="text-slate-400">// Sin transiciones registradas aún.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- MÓDULO NIVEL 2: LENGUAJES LIBRES DE CONTEXTO (AUTÓMATA DE PILA / LIFO) -->
+    <!-- ===================================================================== -->
+    <section id="module-2" class="chomsky-module hidden space-y-6">
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-sm">
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+          <div class="space-y-2 max-w-3xl">
+            <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-50 text-teal-800 border border-teal-200">
+              <span>Nivel 2 · Gramática Independiente del Contexto (Tipo 2)</span>
+              <span>·</span>
+              <span>Autómata de Pila (AP · Memoria LIFO)</span>
+            </div>
+            <h2 class="text-xl sm:text-2xl font-bold text-slate-900">
+              Reconocimiento de Lenguajes con Memoria LIFO (Pila)
+            </h2>
+            <p class="text-sm text-slate-600 leading-relaxed">
+              Los lenguajes libres de contexto requieren memoria auxiliar ilimitada de tipo <span class="font-semibold text-slate-800">LIFO (Last-In, First-Out)</span>.
+              Cada transición <span class="mono font-semibold text-slate-800">δ(q, a, X) → (p, γ)</span> lee el estado actual, el símbolo de entrada <span class="mono">a</span> (o ε) y desapila <span class="mono">X</span> del tope para apilar <span class="mono">γ</span>.
+            </p>
+          </div>
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs space-y-1.5 shrink-0 lg:w-72">
+            <div class="font-semibold text-slate-800 uppercase tracking-wider text-[11px]">Comportamiento LIFO</div>
+            <p class="text-slate-600">
+              El último símbolo introducido (<span class="font-semibold text-teal-700">TOP</span>) es el primero en extraerse al emparejar estructuras anidadas como <span class="mono">aⁿbⁿ</span> o paréntesis balanceados.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Columna izquierda: Lenguaje AP y cadenas -->
+        <div class="lg:col-span-5 space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+            <h3 class="font-bold text-slate-900 text-base">1. Seleccionar Lenguaje Libre de Contexto</h3>
+            <div id="pda-presets-container" class="space-y-2"></div>
+            <div id="pda-info-box" class="rounded-xl bg-teal-50/60 border border-teal-200/80 p-3.5 text-xs space-y-1.5"></div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+            <h3 class="font-bold text-slate-900 text-base">2. Cadena de Entrada</h3>
+            <div>
+              <label for="pda-input-string" class="block text-xs font-semibold text-slate-600 mb-1.5">
+                Cadena a analizar
+              </label>
+              <div class="flex gap-2">
+                <input
+                  id="pda-input-string"
+                  type="text"
+                  placeholder="Ej. aaabbb o (())()"
+                  class="flex-1 px-3.5 py-2.5 text-sm mono rounded-xl border border-slate-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                />
+                <button type="button" id="pda-load-btn" class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition">
+                  Cargar
+                </button>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <div class="text-xs font-semibold uppercase tracking-wider text-slate-500">Cadenas de Prueba</div>
+              <div id="pda-sample-strings" class="flex flex-wrap gap-2"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Columna derecha: Cinta + Pila LIFO interactiva + Controles -->
+        <div class="lg:col-span-7 space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-5">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 class="font-bold text-slate-900 text-base">3. Visualización de Cinta y Pila LIFO</h3>
+                <p class="text-xs text-slate-500">Sigue el estado activo, el símbolo consumido y las operaciones PUSH / POP</p>
+              </div>
+              <div id="pda-verdict-badge" class="px-3 py-1 rounded-full text-xs font-bold border bg-slate-100 text-slate-700 border-slate-300">
+                Listo para simular
+              </div>
+            </div>
+
+            <!-- Cinta de entrada -->
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
+              <div class="flex items-center justify-between text-xs text-slate-500">
+                <span class="font-semibold">Entrada Restante / Consumida</span>
+                <span id="pda-step-counter" class="mono font-semibold text-slate-700">Paso 0 · Estado: —</span>
+              </div>
+              <div id="pda-tape-view" class="flex flex-wrap items-center gap-1.5 min-h-[46px]"></div>
+            </div>
+
+            <!-- Grid: Estado & Acción vs Pila LIFO -->
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-stretch">
+              <!-- Estado y última operación -->
+              <div class="md:col-span-7 bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col justify-between space-y-3">
+                <div>
+                  <div class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Estado Actual del Autómata</div>
+                  <div id="pda-state-display" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-teal-600 text-white font-mono font-bold text-sm shadow-sm">
+                    q0
+                  </div>
+                </div>
+
+                <div class="space-y-1.5">
+                  <div class="text-xs font-semibold uppercase tracking-wider text-slate-500">Operación en la Pila</div>
+                  <div id="pda-stack-op" class="rounded-lg bg-white border border-slate-200 px-3 py-2 text-xs mono text-slate-800">
+                    Pila inicializada con marcador de fondo <span class="font-bold text-teal-700">Z0</span>.
+                  </div>
+                </div>
+
+                <div class="text-xs text-slate-600 bg-white border border-slate-200 rounded-lg p-3">
+                  <span class="font-semibold text-slate-800">Tope actual (TOP):</span>
+                  <span id="pda-top-symbol" class="mono font-bold text-teal-700 ml-1">Z0</span>
+                  <span class="mx-2 text-slate-300">|</span>
+                  <span class="font-semibold text-slate-800">Altura:</span>
+                  <span id="pda-stack-height" class="mono font-bold text-slate-900 ml-1">1</span>
+                </div>
+              </div>
+
+              <!-- Visualización vertical de la Pila LIFO -->
+              <div class="md:col-span-5 bg-slate-900 text-white rounded-xl p-4 flex flex-col justify-between border border-slate-800">
+                <div class="flex items-center justify-between text-xs mb-2">
+                  <span class="font-mono font-semibold text-teal-300 uppercase tracking-wider">Pila LIFO</span>
+                  <span class="text-[11px] text-slate-400">↑ Tope (POP/PUSH)</span>
+                </div>
+
+                <div id="pda-stack-container" class="flex-1 flex flex-col-reverse justify-start gap-1.5 min-h-[180px] max-h-[230px] overflow-y-auto px-1 py-1 border-x-2 border-b-2 border-slate-600 rounded-b-xl bg-slate-950/60"></div>
+
+                <div class="text-[11px] text-center text-slate-400 mono mt-2">
+                  Base de pila (Z₀)
+                </div>
+              </div>
+            </div>
+
+            <!-- Controles -->
+            <div class="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+              <div class="flex flex-wrap items-center gap-2">
+                <button type="button" id="pda-step-btn" class="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold transition shadow-sm">
+                  Paso siguiente
+                </button>
+                <button type="button" id="pda-play-btn" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition shadow-sm">
+                  Reproducir
+                </button>
+                <button type="button" id="pda-run-all-btn" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold transition">
+                  Evaluar directo
+                </button>
+                <button type="button" id="pda-reset-btn" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold border border-slate-300 transition">
+                  Reiniciar
+                </button>
+              </div>
+
+              <div class="flex items-center gap-2 text-xs text-slate-600">
+                <label for="pda-speed" class="font-medium">Velocidad:</label>
+                <select id="pda-speed" class="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-medium outline-none">
+                  <option value="1100">Lenta (1.1s)</option>
+                  <option value="650" selected>Normal (0.65s)</option>
+                  <option value="250">Rápida (0.25s)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Traza -->
+            <div class="space-y-2">
+              <div class="text-xs font-semibold uppercase tracking-wider text-slate-500">Traza de Configuración (Estado, Entrada, Pila)</div>
+              <div id="pda-trace-log" class="max-h-48 overflow-y-auto rounded-xl bg-slate-950 text-slate-100 p-3.5 text-xs mono space-y-1.5">
+                <div class="text-slate-400">// Sin pasos ejecutados aún.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- MÓDULO NIVEL 1: LENGUAJES SENSIBLES AL CONTEXTO (LBA)                 -->
+    <!-- ===================================================================== -->
+    <section id="module-1" class="chomsky-module hidden space-y-6">
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-sm">
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+          <div class="space-y-2 max-w-3xl">
+            <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+              <span>Nivel 1 · Gramática Sensible al Contexto (Tipo 1)</span>
+              <span>·</span>
+              <span>Autómata Linealmente Acotado (LBA)</span>
+            </div>
+            <h2 class="text-xl sm:text-2xl font-bold text-slate-900">
+              Reconocimiento de Lenguajes con Cinta Acotada a la Entrada
+            </h2>
+            <p class="text-sm text-slate-600 leading-relaxed">
+              Un LBA es una máquina de cinta restringida al espacio <span class="mono font-semibold text-slate-800">O(|w|)</span> delimitada por marcadores de frontera izquierdo <span class="mono font-bold text-amber-700">[</span> y derecho <span class="mono font-bold text-amber-700">]</span>.
+              Su cabezal se mueve bidireccionalmente (<span class="mono">L</span> / <span class="mono">R</span>) sin cruzar los delimitadores, permitiendo reconocer lenguajes no libres de contexto como <span class="mono font-semibold">{aⁿbⁿcⁿ | n ≥ 1}</span> o duplicación <span class="mono font-semibold">{w#w}</span>.
+            </p>
+          </div>
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs space-y-1.5 shrink-0 lg:w-72">
+            <div class="font-semibold text-slate-800 uppercase tracking-wider text-[11px]">Frontera Lineal</div>
+            <p class="text-slate-600">
+              El cabezal nunca sobrepasa <span class="mono font-bold">[</span> (izquierda) ni <span class="mono font-bold">]</span> (derecha), garantizando memoria acotada linealmente a la longitud de entrada.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Columna izquierda: Lenguaje LBA y entradas -->
+        <div class="lg:col-span-5 space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+            <h3 class="font-bold text-slate-900 text-base">1. Seleccionar Lenguaje Sensible al Contexto</h3>
+            <div id="lba-presets-container" class="space-y-2"></div>
+            <div id="lba-info-box" class="rounded-xl bg-amber-50/70 border border-amber-200/80 p-3.5 text-xs space-y-1.5"></div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+            <h3 class="font-bold text-slate-900 text-base">2. Cadena de Entrada</h3>
+            <div>
+              <label for="lba-input-string" class="block text-xs font-semibold text-slate-600 mb-1.5">
+                Cadena a evaluar
+              </label>
+              <div class="flex gap-2">
+                <input
+                  id="lba-input-string"
+                  type="text"
+                  placeholder="Ej. aabbcc o ab#ab"
+                  class="flex-1 px-3.5 py-2.5 text-sm mono rounded-xl border border-slate-300 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+                />
+                <button type="button" id="lba-load-btn" class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition">
+                  Cargar
+                </button>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <div class="text-xs font-semibold uppercase tracking-wider text-slate-500">Cadenas de Prueba</div>
+              <div id="lba-sample-strings" class="flex flex-wrap gap-2"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Columna derecha: Cinta acotada con [ y ], cabezal bidireccional y controles -->
+        <div class="lg:col-span-7 space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-5">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 class="font-bold text-slate-900 text-base">3. Cinta Acotada y Cabezal Bidireccional</h3>
+                <p class="text-xs text-slate-500">Delimitadores <span class="mono font-semibold">[</span> y <span class="mono font-semibold">]</span>, lectura/escritura y desplazamiento L / R</p>
+              </div>
+              <div id="lba-verdict-badge" class="px-3 py-1 rounded-full text-xs font-bold border bg-slate-100 text-slate-700 border-slate-300">
+                Listo para simular
+              </div>
+            </div>
+
+            <!-- Cinta acotada visual -->
+            <div class="bg-slate-900 text-white rounded-xl p-4 sm:p-5 border border-slate-800 space-y-3">
+              <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span class="font-mono text-amber-300 font-semibold">Cinta Acotada [ ... ]</span>
+                <span id="lba-status-meta" class="mono text-slate-300">Paso 0 · Estado: — · Pos: —</span>
+              </div>
+
+              <div id="lba-tape-view" class="flex items-center justify-start gap-1.5 overflow-x-auto py-3 px-1"></div>
+
+              <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 pt-1 border-t border-slate-800">
+                <span><strong class="text-amber-300">[</strong> Frontera izquierda</span>
+                <span><strong class="text-amber-300">]</strong> Frontera derecha</span>
+                <span><strong class="text-sky-300">▼</strong> Cabezal L/W (L / R / S)</span>
+              </div>
+            </div>
+
+            <!-- Detalle de lectura/escritura y estado -->
+            <div id="lba-step-detail" class="rounded-xl bg-amber-50/70 border border-amber-200/80 px-4 py-3 text-xs mono text-amber-950">
+              Carga una cadena y avanza paso a paso o reproduce la simulación.
+            </div>
+
+            <!-- Controles -->
+            <div class="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+              <div class="flex flex-wrap items-center gap-2">
+                <button type="button" id="lba-step-btn" class="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold transition shadow-sm">
+                  Paso siguiente
+                </button>
+                <button type="button" id="lba-play-btn" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition shadow-sm">
+                  Reproducir
+                </button>
+                <button type="button" id="lba-run-all-btn" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold transition">
+                  Evaluar directo
+                </button>
+                <button type="button" id="lba-reset-btn" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold border border-slate-300 transition">
+                  Reiniciar
+                </button>
+              </div>
+
+              <div class="flex items-center gap-2 text-xs text-slate-600">
+                <label for="lba-speed" class="font-medium">Velocidad:</label>
+                <select id="lba-speed" class="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-medium outline-none">
+                  <option value="900">Lenta (0.9s)</option>
+                  <option value="420" selected>Normal (0.42s)</option>
+                  <option value="120">Rápida (0.12s)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Log -->
+            <div class="space-y-2">
+              <div class="text-xs font-semibold uppercase tracking-wider text-slate-500">Traza de Ejecución del LBA</div>
+              <div id="lba-trace-log" class="max-h-48 overflow-y-auto rounded-xl bg-slate-950 text-slate-100 p-3.5 text-xs mono space-y-1.5">
+                <div class="text-slate-400">// Sin transiciones registradas aún.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- MÓDULO NIVEL 0: RECURSIVAMENTE ENUMERABLES (MÁQUINA DE TURING)        -->
+    <!-- ===================================================================== -->
+    <section id="module-0" class="chomsky-module hidden space-y-6">
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-sm">
+        <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+          <div class="space-y-2 max-w-3xl">
+            <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200">
+              <span>Nivel 0 · Gramática No Restringida (Tipo 0)</span>
+              <span>·</span>
+              <span>Máquina de Turing (MT)</span>
+            </div>
+            <h2 class="text-xl sm:text-2xl font-bold text-slate-900">
+              Máquina de Turing: Aceptación de Lenguajes y Funciones Aritméticas
+            </h2>
+            <p class="text-sm text-slate-600 leading-relaxed">
+              La Máquina de Turing es el modelo computacional universal de la Jerarquía de Chomsky.
+              Opera sobre una cinta potencialmente extensible a ambos lados con blanco <span class="mono font-bold text-rose-700">⊔</span>, alfabeto de cinta <span class="mono font-semibold">Γ</span>, estado activo <span class="mono font-semibold">q</span>, cabezal de lectura/escritura y función <span class="mono font-semibold">δ(q, s) = (q', s', D)</span> con <span class="mono">D ∈ {L, R, S}</span>.
+            </p>
+          </div>
+          <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs space-y-1.5 shrink-0 lg:w-72">
+            <div class="font-semibold text-slate-800 uppercase tracking-wider text-[11px]">Modos de Ejecución</div>
+            <p class="text-slate-600">
+              Incluye reconocimiento de lenguajes (<span class="mono">{0ⁿ1ⁿ}</span>, palíndromos binarios) y cómputo aritmético (suma unaria <span class="mono">1ᵃ+1ᵇ</span> e incremento binario <span class="mono">+1</span>).
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Columna izquierda: Máquinas MT y entradas -->
+        <div class="lg:col-span-5 space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+            <h3 class="font-bold text-slate-900 text-base">1. Seleccionar Máquina de Turing</h3>
+            <div id="tm-presets-container" class="space-y-2"></div>
+            <div id="tm-info-box" class="rounded-xl bg-rose-50/60 border border-rose-200/80 p-3.5 text-xs space-y-1.5"></div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+            <h3 class="font-bold text-slate-900 text-base">2. Entrada en la Cinta</h3>
+            <div>
+              <label for="tm-input-string" class="block text-xs font-semibold text-slate-600 mb-1.5">
+                Cadena / Operandos iniciales
+              </label>
+              <div class="flex gap-2">
+                <input
+                  id="tm-input-string"
+                  type="text"
+                  placeholder="Ej. 111+11 o 0011"
+                  class="flex-1 px-3.5 py-2.5 text-sm mono rounded-xl border border-slate-300 focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none"
+                />
+                <button type="button" id="tm-load-btn" class="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition">
+                  Cargar
+                </button>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <div class="text-xs font-semibold uppercase tracking-wider text-slate-500">Ejemplos de Prueba</div>
+              <div id="tm-sample-strings" class="flex flex-wrap gap-2"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Columna derecha: Cinta extendible, alfabeto, cabezal, estado, contador de pasos -->
+        <div class="lg:col-span-7 space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-5">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 class="font-bold text-slate-900 text-base">3. Cinta Extendible y Estado de la MT</h3>
+                <p class="text-xs text-slate-500">Cinta dinámica con blancos (⊔), alfabeto de cinta, cabezal R/W, estado activo y contador de pasos</p>
+              </div>
+              <div id="tm-verdict-badge" class="px-3 py-1 rounded-full text-xs font-bold border bg-slate-100 text-slate-700 border-slate-300">
+                Listo para ejecutar
+              </div>
+            </div>
+
+            <!-- Indicadores clave de la MT -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div class="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                <div class="text-[11px] font-semibold uppercase text-slate-500">Estado Activo</div>
+                <div id="tm-active-state" class="text-base font-bold mono text-rose-700 mt-0.5">—</div>
+              </div>
+              <div class="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                <div class="text-[11px] font-semibold uppercase text-slate-500">Contador de Pasos</div>
+                <div id="tm-step-count" class="text-base font-bold mono text-slate-900 mt-0.5">0</div>
+              </div>
+              <div class="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                <div class="text-[11px] font-semibold uppercase text-slate-500">Pos. Cabezal</div>
+                <div id="tm-head-pos" class="text-base font-bold mono text-slate-900 mt-0.5">0</div>
+              </div>
+              <div class="rounded-xl bg-slate-50 border border-slate-200 p-3">
+                <div class="text-[11px] font-semibold uppercase text-slate-500">Alfabeto Cinta (Γ)</div>
+                <div id="tm-tape-alphabet" class="text-xs font-semibold mono text-slate-800 mt-1 truncate">—</div>
+              </div>
+            </div>
+
+            <!-- Cinta extendible visual -->
+            <div class="bg-slate-900 text-white rounded-xl p-4 sm:p-5 border border-slate-800 space-y-3">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-mono text-rose-300 font-semibold">← Cinta Extendible (⊔ = Blanco) →</span>
+                <span id="tm-read-write-indicator" class="mono text-slate-300">Símbolo bajo cabezal: —</span>
+              </div>
+
+              <div id="tm-tape-view" class="flex items-center justify-start gap-1.5 overflow-x-auto py-3 px-1"></div>
+            </div>
+
+            <!-- Salida / Resultado del cálculo o aceptación -->
+            <div id="tm-output-summary" class="rounded-xl bg-rose-50/70 border border-rose-200/80 px-4 py-3 text-xs mono text-rose-950">
+              Carga una entrada para iniciar la ejecución de la Máquina de Turing.
+            </div>
+
+            <!-- Controles -->
+            <div class="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+              <div class="flex flex-wrap items-center gap-2">
+                <button type="button" id="tm-step-btn" class="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition shadow-sm">
+                  Paso siguiente
+                </button>
+                <button type="button" id="tm-play-btn" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition shadow-sm">
+                  Reproducir
+                </button>
+                <button type="button" id="tm-run-all-btn" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold transition">
+                  Evaluar directo
+                </button>
+                <button type="button" id="tm-reset-btn" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold border border-slate-300 transition">
+                  Reiniciar
+                </button>
+              </div>
+
+              <div class="flex items-center gap-2 text-xs text-slate-600">
+                <label for="tm-speed" class="font-medium">Velocidad:</label>
+                <select id="tm-speed" class="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-medium outline-none">
+                  <option value="800">Lenta (0.8s)</option>
+                  <option value="320" selected>Normal (0.32s)</option>
+                  <option value="90">Rápida (0.09s)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Traza -->
+            <div class="space-y-2">
+              <div class="text-xs font-semibold uppercase tracking-wider text-slate-500">Traza de Transiciones δ(q, s) → (q', s', D)</div>
+              <div id="tm-trace-log" class="max-h-48 overflow-y-auto rounded-xl bg-slate-950 text-slate-100 p-3.5 text-xs mono space-y-1.5">
+                <div class="text-slate-400">// Sin pasos ejecutados aún.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- RESUMEN COMPARATIVO DE LOS 4 NIVELES DE LA JERARQUÍA DE CHOMSKY       -->
+    <!-- ===================================================================== -->
+    <section class="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-sm">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">Síntesis de la Jerarquía de Chomsky</h3>
+          <p class="text-xs text-slate-500">Relación de inclusión estricta: Tipo 3 ⊂ Tipo 2 ⊂ Tipo 1 ⊂ Tipo 0</p>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="border-b border-slate-200 text-slate-500 uppercase tracking-wider">
+              <th class="py-2.5 px-3 font-semibold">Nivel</th>
+              <th class="py-2.5 px-3 font-semibold">Familia de Lenguaje</th>
+              <th class="py-2.5 px-3 font-semibold">Gramática</th>
+              <th class="py-2.5 px-3 font-semibold">Autómata / Modelo</th>
+              <th class="py-2.5 px-3 font-semibold">Memoria</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 text-slate-700">
+            <tr class="hover:bg-slate-50">
+              <td class="py-2.5 px-3 font-mono font-bold text-blue-700">Nivel 3</td>
+              <td class="py-2.5 px-3 font-medium">Regulares</td>
+              <td class="py-2.5 px-3 mono">Tipo 3 (Regular)</td>
+              <td class="py-2.5 px-3">Autómata Finito (AFD / AFND)</td>
+              <td class="py-2.5 px-3">Finita (solo estado actual)</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="py-2.5 px-3 font-mono font-bold text-teal-700">Nivel 2</td>
+              <td class="py-2.5 px-3 font-medium">Libres de Contexto</td>
+              <td class="py-2.5 px-3 mono">Tipo 2 (GLC)</td>
+              <td class="py-2.5 px-3">Autómata de Pila (AP)</td>
+              <td class="py-2.5 px-3">Pila ilimitada (LIFO)</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="py-2.5 px-3 font-mono font-bold text-amber-700">Nivel 1</td>
+              <td class="py-2.5 px-3 font-medium">Sensibles al Contexto</td>
+              <td class="py-2.5 px-3 mono">Tipo 1 (GSC)</td>
+              <td class="py-2.5 px-3">Autómata Linealmente Acotado (LBA)</td>
+              <td class="py-2.5 px-3">Cinta acotada a O(|w|) con [ y ]</td>
+            </tr>
+            <tr class="hover:bg-slate-50">
+              <td class="py-2.5 px-3 font-mono font-bold text-rose-700">Nivel 0</td>
+              <td class="py-2.5 px-3 font-medium">Recursivamente Enumerables</td>
+              <td class="py-2.5 px-3 mono">Tipo 0 (Irrestricta)</td>
+              <td class="py-2.5 px-3">Máquina de Turing (MT)</td>
+              <td class="py-2.5 px-3">Cinta potencialmente infinita</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="bg-slate-900 text-slate-400 text-xs py-4 border-t border-slate-800 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <span>Simulador Académico de Jerarquía de Chomsky · Niveles 3, 2, 1 y 0</span>
+      <span class="mono">HTML5 · Tailwind CSS · JavaScript (Autónomo)</span>
+    </div>
+  </footer>
+
+  <!-- ======================================================================= -->
+  <!-- LÓGICA DE SIMULACIÓN DE LOS 4 MODELOS COMPUTACIONALES                  -->
+  <!-- ======================================================================= -->
+  <script>
+    /**
+     * Utilidad de notificaciones no bloqueantes en pantalla (reemplaza alert/confirm).
+     */
+    function showToast(message, type = 'info') {
+      const banner = document.getElementById('toast-banner');
+      const inner = document.getElementById('toast-inner');
+      const msgEl = document.getElementById('toast-message');
+
+      inner.className = 'rounded-xl px-4 py-3 text-sm font-medium flex items-center justify-between gap-3 border shadow-sm ';
+      if (type === 'error') {
+        inner.className += 'bg-rose-50 text-rose-900 border-rose-200';
+      } else if (type === 'success') {
+        inner.className += 'bg-emerald-50 text-emerald-900 border-emerald-200';
+      } else {
+        inner.className += 'bg-blue-50 text-blue-900 border-blue-200';
+      }
+
+      msgEl.textContent = message;
+      banner.classList.remove('hidden');
+    }
+
+    document.getElementById('toast-close').addEventListener('click', () => {
+      document.getElementById('toast-banner').classList.add('hidden');
+    });
+
+    /**
+     * Escapa caracteres HTML básicos para evitar inyección en logs dinámicos.
+     */
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    // =========================================================================
+    // NAVEGACIÓN ENTRE MÓDULOS DE LA JERARQUÍA DE CHOMSKY
+    // =========================================================================
+    const levelMeta = {
+      3: { badge: 'Nivel 3 · AFD', navClass: 'bg-blue-600 text-white border-blue-500 shadow-sm' },
+      2: { badge: 'Nivel 2 · AP (LIFO)', navClass: 'bg-teal-600 text-white border-teal-500 shadow-sm' },
+      1: { badge: 'Nivel 1 · LBA', navClass: 'bg-amber-600 text-white border-amber-500 shadow-sm' },
+      0: { badge: 'Nivel 0 · MT', navClass: 'bg-rose-600 text-white border-rose-500 shadow-sm' },
+    };
+
+    function stopAllTimers() {
+      if (dfaState.timer) { clearInterval(dfaState.timer); dfaState.timer = null; }
+      if (pdaState.timer) { clearInterval(pdaState.timer); pdaState.timer = null; }
+      if (lbaState.timer) { clearInterval(lbaState.timer); lbaState.timer = null; }
+      if (tmState.timer)  { clearInterval(tmState.timer);  tmState.timer = null; }
+      updatePlayButtonLabels();
+    }
+
+    function switchLevel(level) {
+      stopAllTimers();
+      const lvl = String(level);
+
+      document.querySelectorAll('.chomsky-module').forEach(sec => {
+        sec.classList.toggle('hidden', sec.id !== `module-${lvl}`);
+      });
+
+      document.querySelectorAll('.nav-level-btn').forEach(btn => {
+        const bLvl = btn.getAttribute('data-level');
+        if (bLvl === lvl) {
+          btn.className = `nav-level-btn group text-left p-3 rounded-xl border transition-all duration-150 flex items-center justify-between gap-2 ${levelMeta[lvl].navClass}`;
+        } else {
+          btn.className = 'nav-level-btn group text-left p-3 rounded-xl border transition-all duration-150 flex items-center justify-between gap-2 bg-slate-900/80 hover:bg-slate-800 text-slate-200 border-slate-700/80';
+        }
+      });
+
+      document.getElementById('header-active-badge').textContent = levelMeta[lvl].badge;
+    }
+
+    document.querySelectorAll('.nav-level-btn').forEach(btn => {
+      btn.addEventListener('click', () => switchLevel(btn.getAttribute('data-level')));
+    });
+
+    // =========================================================================
+    // NIVEL 3: AUTÓMATA FINITO DETERMINISTA (AFD) — PREDETERMINADO Y PARAMETRIZABLE
+    // =========================================================================
+    const DFA_PRESETS = [
+      {
+        id: 'ends-01',
+        name: 'Termina en "01" sobre {0, 1}',
+        regex: '(0|1)*01',
+        description: 'Acepta cadenas binarias que finalizan exactamente con los símbolos "01".',
+        states: ['q0', 'q1', 'q2'],
+        alphabet: ['0', '1'],
+        start: 'q0',
+        accept: ['q2'],
+        transitions: {
+          'q0,0': 'q1',
+          'q0,1': 'q0',
+          'q1,0': 'q1',
+          'q1,1': 'q2',
+          'q2,0': 'q1',
+          'q2,1': 'q0',
+        },
+        samples: [
+          { label: '01 (Válida)', value: '01', valid: true },
+          { label: '1101 (Válida)', value: '1101', valid: true },
+          { label: '00101 (Válida)', value: '00101', valid: true },
+          { label: '110 (Inválida)', value: '110', valid: false },
+          { label: '111 (Inválida)', value: '111', valid: false },
+          { label: 'ε (Inválida)', value: '', valid: false },
+        ]
+      },
+      {
+        id: 'even-zeros',
+        name: 'Cantidad par de ceros sobre {0, 1}',
+        regex: '(1*01*01*)*',
+        description: 'Acepta cadenas con un número par de símbolos "0" (incluyendo 0 ceros / ε).',
+        states: ['qPar', 'qImpar'],
+        alphabet: ['0', '1'],
+        start: 'qPar',
+        accept: ['qPar'],
+        transitions: {
+          'qPar,0': 'qImpar',
+          'qPar,1': 'qPar',
+          'qImpar,0': 'qPar',
+          'qImpar,1': 'qImpar',
+        },
+        samples: [
+          { label: 'ε (Válida)', value: '', valid: true },
+          { label: '00 (Válida)', value: '00', valid: true },
+          { label: '101011 (Válida)', value: '101011', valid: true },
+          { label: '0 (Inválida)', value: '0', valid: false },
+          { label: '10111 (Inválida)', value: '10111', valid: false },
+        ]
+      },
+      {
+        id: 'mod3-bin',
+        name: 'Binarios múltiplos de 3 sobre {0, 1}',
+        regex: 'Múltiplo de 3 en base 2',
+        description: 'El estado representa el residuo módulo 3 del valor binario leído de izquierda a derecha.',
+        states: ['r0', 'r1', 'r2'],
+        alphabet: ['0', '1'],
+        start: 'r0',
+        accept: ['r0'],
+        transitions: {
+          'r0,0': 'r0',
+          'r0,1': 'r1',
+          'r1,0': 'r2',
+          'r1,1': 'r0',
+          'r2,0': 'r1',
+          'r2,1': 'r2',
+        },
+        samples: [
+          { label: '11 (3 -> Válida)', value: '11', valid: true },
+          { label: '110 (6 -> Válida)', value: '110', valid: true },
+          { label: '1001 (9 -> Válida)', value: '1001', valid: true },
+          { label: '101 (5 -> Inválida)', value: '101', valid: false },
+          { label: '111 (7 -> Inválida)', value: '111', valid: false },
+        ]
+      }
+    ];
+
+    const dfaState = {
+      model: JSON.parse(JSON.stringify(DFA_PRESETS[0])),
+      samples: [...DFA_PRESETS[0].samples],
+      input: '1101',
+      index: 0,
+      currentState: DFA_PRESETS[0].start,
+      finished: false,
+      accepted: null,
+      logs: [],
+      lastMsg: 'Esperando inicio de simulación...',
+      timer: null
+    };
+
+    function syncDfaEditorInputs() {
+      const m = dfaState.model;
+      document.getElementById('dfa-edit-states').value = m.states.join(', ');
+      document.getElementById('dfa-edit-alphabet').value = m.alphabet.join(', ');
+      document.getElementById('dfa-edit-start').value = m.start;
+      document.getElementById('dfa-edit-accept').value = m.accept.join(', ');
+      const lines = Object.entries(m.transitions).map(([k, v]) => {
+        const [q, sym] = k.split(',');
+        return `${q},${sym}->${v}`;
+      });
+      document.getElementById('dfa-edit-transitions').value = lines.join('\n');
+    }
+
+    function renderDfaPresets() {
+      const container = document.getElementById('dfa-presets-container');
+      container.innerHTML = '';
+
+      DFA_PRESETS.forEach(p => {
+        const isSelected = dfaState.model.id === p.id;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `w-full text-left p-3 rounded-xl border transition flex items-center justify-between gap-2 ${
+          isSelected
+            ? 'bg-blue-50 border-blue-400 text-blue-950 shadow-xs'
+            : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800'
+        }`;
+        btn.innerHTML = `
+          <div>
+            <div class="font-semibold text-xs sm:text-sm">${escapeHtml(p.name)}</div>
+            <div class="text-[11px] mono text-slate-500 mt-0.5">${escapeHtml(p.regex)}</div>
+          </div>
+          <span class="text-[11px] font-semibold px-2 py-0.5 rounded-md ${isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}">
+            ${isSelected ? 'Activo' : 'Usar'}
+          </span>
+        `;
+        btn.addEventListener('click', () => {
+          stopAllTimers();
+          dfaState.model = JSON.parse(JSON.stringify(p));
+          dfaState.samples = [...p.samples];
+          syncDfaEditorInputs();
+          if (p.samples.length > 0) {
+            dfaState.input = p.samples[0].value;
+            document.getElementById('dfa-input-string').value = p.samples[0].value;
+          }
+          resetDfaSimulation();
+          renderDfaPresets();
+          renderDfaSamples();
+          showToast(`AFD cargado: ${p.name}`, 'info');
+        });
+        container.appendChild(btn);
+      });
+    }
+
+    function renderDfaSamples() {
+      const container = document.getElementById('dfa-sample-strings');
+      container.innerHTML = '';
+      dfaState.samples.forEach(s => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        const badgeColor = s.valid
+          ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+          : 'bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-200';
+        btn.className = `px-2.5 py-1.5 rounded-lg border text-xs mono font-medium transition ${badgeColor}`;
+        btn.textContent = s.label;
+        btn.title = s.value === '' ? 'Cadena vacía (ε)' : `Cadena: "${s.value}"`;
+        btn.addEventListener('click', () => {
+          stopAllTimers();
+          dfaState.input = s.value;
+          document.getElementById('dfa-input-string').value = s.value;
+          resetDfaSimulation();
+        });
+        container.appendChild(btn);
+      });
+    }
+
+    function resetDfaSimulation() {
+      if (dfaState.timer) { clearInterval(dfaState.timer); dfaState.timer = null; }
+      dfaState.index = 0;
+      dfaState.currentState = dfaState.model.start;
+      dfaState.finished = false;
+      dfaState.accepted = null;
+      dfaState.logs = [];
+      dfaState.lastMsg = `Estado inicial q₀ = ${dfaState.model.start}. Cadena de longitud ${dfaState.input.length} lista.`;
+      renderDfaView();
+      updatePlayButtonLabels();
+    }
+
+    function stepDfa() {
+      if (dfaState.finished) {
+        stopAllTimers();
+        return;
+      }
+
+      const chars = Array.from(dfaState.input);
+      const m = dfaState.model;
+
+      // Si ya consumimos todos los símbolos, evaluamos aceptación
+      if (dfaState.index >= chars.length) {
+        const isAcc = m.accept.includes(dfaState.currentState);
+        dfaState.finished = true;
+        dfaState.accepted = isAcc;
+        const verdictText = isAcc
+          ? `ACEPTADA: El estado final "${dfaState.currentState}" pertenece a F = {${m.accept.join(', ')}}.`
+          : `RECHAZADA: El estado final "${dfaState.currentState}" NO pertenece a F = {${m.accept.join(', ')}}.`;
+        dfaState.lastMsg = verdictText;
+        dfaState.logs.push(`[FIN] ${verdictText}`);
+        stopAllTimers();
+        renderDfaView();
+        return;
+      }
+
+      const sym = chars[dfaState.index];
+      if (!m.alphabet.includes(sym)) {
+        dfaState.finished = true;
+        dfaState.accepted = false;
+        const errMsg = `RECHAZADA: Símbolo "${sym}" no pertenece al alfabeto Σ = {${m.alphabet.join(', ')}}.`;
+        dfaState.lastMsg = errMsg;
+        dfaState.logs.push(`[ERROR] ${errMsg}`);
+        stopAllTimers();
+        renderDfaView();
+        return;
+      }
+
+      const key = `${dfaState.currentState},${sym}`;
+      const nextState = m.transitions[key];
+
+      if (!nextState || !m.states.includes(nextState)) {
+        dfaState.finished = true;
+        dfaState.accepted = false;
+        const undefMsg = `RECHAZADA: No existe transición definida para δ(${dfaState.currentState}, ${sym}).`;
+        dfaState.lastMsg = undefMsg;
+        dfaState.logs.push(`[ERROR] ${undefMsg}`);
+        stopAllTimers();
+        renderDfaView();
+        return;
+      }
+
+      const prevState = dfaState.currentState;
+      dfaState.currentState = nextState;
+      dfaState.index += 1;
+
+      const stepLine = `Paso ${dfaState.index}: δ(${prevState}, '${sym}') → ${nextState}`;
+      dfaState.lastMsg = stepLine;
+      dfaState.logs.push(stepLine);
+
+      // Si era el último símbolo, cerramos evaluación inmediatamente al completar el consumo
+      if (dfaState.index === chars.length) {
+        const isAcc = m.accept.includes(dfaState.currentState);
+        dfaState.finished = true;
+        dfaState.accepted = isAcc;
+        const endLine = isAcc
+          ? `Cadena consumida. Estado "${dfaState.currentState}" ∈ F → CADENA ACEPTADA`
+          : `Cadena consumida. Estado "${dfaState.currentState}" ∉ F → CADENA RECHAZADA`;
+        dfaState.logs.push(endLine);
+        dfaState.lastMsg = `${stepLine} | ${endLine}`;
+        stopAllTimers();
+      }
+
+      renderDfaView();
+    }
+
+    function runAllDfa() {
+      stopAllTimers();
+      resetDfaSimulation();
+      let guard = 0;
+      while (!dfaState.finished && guard < 10000) {
+        stepDfa();
+        guard++;
+      }
+    }
+
+    function renderDfaView() {
+      const m = dfaState.model;
+      const chars = Array.from(dfaState.input);
+
+      // Resumen del AFD
+      document.getElementById('dfa-active-summary').innerHTML = `
+        <div><span class="font-semibold text-slate-700">Modelo:</span> ${escapeHtml(m.name)}</div>
+        <div class="mono text-[11px] text-slate-600">Q = {${m.states.join(', ')}} · Σ = {${m.alphabet.join(', ')}}</div>
+        <div class="mono text-[11px] text-slate-600">q₀ = ${escapeHtml(m.start)} · F = {${m.accept.join(', ')}}</div>
+      `;
+
+      // Veredicto
+      const verdictEl = document.getElementById('dfa-verdict-badge');
+      if (!dfaState.finished) {
+        verdictEl.className = 'px-3 py-1 rounded-full text-xs font-bold border bg-blue-50 text-blue-700 border-blue-200';
+        verdictEl.textContent = dfaState.index > 0 ? 'En proceso...' : 'Listo para simular';
+      } else if (dfaState.accepted) {
+        verdictEl.className = 'px-3 py-1 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-300';
+        verdictEl.textContent = '✓ Cadena Aceptada';
+      } else {
+        verdictEl.className = 'px-3 py-1 rounded-full text-xs font-bold border bg-rose-50 text-rose-700 border-rose-300';
+        verdictEl.textContent = '✕ Cadena Rechazada';
+      }
+
+      // Contador y cinta
+      document.getElementById('dfa-step-counter').textContent = `Paso ${dfaState.index} / ${chars.length}`;
+      const tapeEl = document.getElementById('dfa-tape-view');
+      tapeEl.innerHTML = '';
+
+      if (chars.length === 0) {
+        tapeEl.innerHTML = `<span class="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-xs mono text-slate-600">ε (Cadena vacía)</span>`;
+      } else {
+        chars.forEach((ch, idx) => {
+          const cell = document.createElement('div');
+          let cls = 'w-10 h-10 rounded-lg border flex items-center justify-center mono text-sm font-bold transition ';
+          if (idx < dfaState.index) {
+            cls += 'bg-slate-200/80 text-slate-500 border-slate-300';
+          } else if (idx === dfaState.index && !dfaState.finished) {
+            cls += 'bg-blue-600 text-white border-blue-700 shadow-sm scale-105';
+          } else {
+            cls += 'bg-white text-slate-800 border-slate-300';
+          }
+          cell.className = cls;
+          cell.textContent = ch;
+          tapeEl.appendChild(cell);
+        });
+      }
+
+      // Estados visuales
+      const statesGrid = document.getElementById('dfa-states-grid');
+      statesGrid.innerHTML = '';
+      m.states.forEach(st => {
+        const isCurrent = dfaState.currentState === st;
+        const isStart = m.start === st;
+        const isAccept = m.accept.includes(st);
+
+        const card = document.createElement('div');
+        let cardCls = 'rounded-xl p-3 border transition-all flex flex-col justify-between min-h-[78px] ';
+        if (isCurrent) {
+          cardCls += 'bg-blue-600 text-white border-blue-700 active-state-ring shadow-md';
+        } else if (isAccept) {
+          cardCls += 'bg-emerald-50/70 text-slate-900 border-emerald-400 border-2';
+        } else {
+          cardCls += 'bg-slate-50 text-slate-800 border-slate-200';
+        }
+        card.className = cardCls;
+
+        const tags = [];
+        if (isStart) tags.push('→ q₀');
+        if (isAccept) tags.push('★ F');
+        if (isCurrent) tags.push('ACTIVO');
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between gap-1">
+            <span class="mono font-bold text-sm">${escapeHtml(st)}</span>
+            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded ${isCurrent ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'}">
+              ${tags.join(' ') || 'Q'}
+            </span>
+          </div>
+          <div class="text-[11px] mt-1 ${isCurrent ? 'text-blue-100' : 'text-slate-500'}">
+            ${isAccept ? 'Estado de aceptación' : isStart ? 'Estado inicial' : 'Estado intermedio'}
+          </div>
+        `;
+        statesGrid.appendChild(card);
+      });
+
+      // Última transición
+      document.getElementById('dfa-last-transition').textContent = dfaState.lastMsg;
+
+      // Tabla de transiciones
+      const tableWrap = document.getElementById('dfa-transition-table');
+      let ths = '<th class="py-2 px-3 bg-slate-50 border-b border-slate-200 font-semibold text-slate-700">Estado</th>';
+      m.alphabet.forEach(a => {
+        ths += `<th class="py-2 px-3 bg-slate-50 border-b border-slate-200 font-mono font-semibold text-slate-700">a = ${escapeHtml(a)}</th>`;
+      });
+      let rows = '';
+      m.states.forEach(q => {
+        const rowActive = dfaState.currentState === q ? 'bg-blue-50/60' : '';
+        rows += `<tr class="${rowActive} border-b border-slate-100 last:border-none">`;
+        rows += `<td class="py-1.5 px-3 font-mono font-semibold text-slate-800">${escapeHtml(q)}${m.accept.includes(q) ? ' (F)' : ''}</td>`;
+        m.alphabet.forEach(a => {
+          const dest = m.transitions[`${q},${a}`] || '—';
+          rows += `<td class="py-1.5 px-3 font-mono text-slate-700">${escapeHtml(dest)}</td>`;
+        });
+        rows += '</tr>';
+      });
+      tableWrap.innerHTML = `<table class="w-full text-left text-xs"><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table>`;
+
+      // Log
+      const logEl = document.getElementById('dfa-trace-log');
+      if (dfaState.logs.length === 0) {
+        logEl.innerHTML = '<div class="text-slate-400">// Sin transiciones registradas aún.</div>';
+      } else {
+        logEl.innerHTML = dfaState.logs.map(l => `<div>${escapeHtml(l)}</div>`).join('');
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+    }
+
+    // Eventos del AFD
+    document.getElementById('dfa-toggle-editor').addEventListener('click', () => {
+      document.getElementById('dfa-editor-panel').classList.toggle('hidden');
+    });
+
+    document.getElementById('dfa-apply-custom').addEventListener('click', () => {
+      try {
+        const states = document.getElementById('dfa-edit-states').value.split(',').map(s => s.trim()).filter(Boolean);
+        const alphabet = document.getElementById('dfa-edit-alphabet').value.split(',').map(s => s.trim()).filter(Boolean);
+        const start = document.getElementById('dfa-edit-start').value.trim();
+        const accept = document.getElementById('dfa-edit-accept').value.split(',').map(s => s.trim()).filter(Boolean);
+        const rawLines = document.getElementById('dfa-edit-transitions').value.split('\n').map(l => l.trim()).filter(Boolean);
+
+        if (states.length === 0 || alphabet.length === 0) {
+          showToast('Debes especificar al menos un estado en Q y un símbolo en Σ.', 'error');
+          return;
+        }
+        if (!states.includes(start)) {
+          showToast(`El estado inicial "${start}" debe pertenecer a Q.`, 'error');
+          return;
+        }
+        if (!accept.every(f => states.includes(f))) {
+          showToast('Todos los estados en F deben pertenecer a Q.', 'error');
+          return;
+        }
+
+        const transitions = {};
+        for (const line of rawLines) {
+          const match = line.match(/^([^,]+),([^-\s]+)\s*->\s*(.+)$/);
+          if (!match) {
+            showToast(`Formato inválido en transición: "${line}". Usa q0,0->q1`, 'error');
+            return;
+          }
+          const [, qFrom, sym, qTo] = match.map(s => s.trim());
+          if (!states.includes(qFrom) || !states.includes(qTo)) {
+            showToast(`Estado desconocido en transición "${line}".`, 'error');
+            return;
+          }
+          transitions[`${qFrom},${sym}`] = qTo;
+        }
+
+        stopAllTimers();
+        dfaState.model = {
+          id: 'custom-dfa',
+          name: 'AFD Personalizado por Usuario',
+          regex: 'Definición manual (Q, Σ, δ, q₀, F)',
+          description: 'Autómata finito determinista configurado manualmente desde la interfaz.',
+          states,
+          alphabet,
+          start,
+          accept,
+          transitions
+        };
+        resetDfaSimulation();
+        renderDfaPresets();
+        showToast('AFD personalizado aplicado correctamente.', 'success');
+      } catch (err) {
+        showToast('Error al procesar el AFD personalizado.', 'error');
+      }
+    });
+
+    document.getElementById('dfa-load-btn').addEventListener('click', () => {
+      stopAllTimers();
+      dfaState.input = document.getElementById('dfa-input-string').value;
+      resetDfaSimulation();
+    });
+
+    document.getElementById('dfa-step-btn').addEventListener('click', () => {
+      stopAllTimers();
+      stepDfa();
+    });
+
+    document.getElementById('dfa-play-btn').addEventListener('click', () => {
+      if (dfaState.timer) {
+        stopAllTimers();
+        return;
+      }
+      if (dfaState.finished) resetDfaSimulation();
+      const delay = Number(document.getElementById('dfa-speed').value) || 650;
+      dfaState.timer = setInterval(() => {
+        if (dfaState.finished) {
+          stopAllTimers();
+        } else {
+          stepDfa();
+        }
+      }, delay);
+      updatePlayButtonLabels();
+    });
+
+    document.getElementById('dfa-run-all-btn').addEventListener('click', runAllDfa);
+    document.getElementById('dfa-reset-btn').addEventListener('click', () => {
+      stopAllTimers();
+      resetDfaSimulation();
+    });
+
+    // =========================================================================
+    // NIVEL 2: AUTÓMATA DE PILA (AP / MEMORIA LIFO)
+    // =========================================================================
+    const PDA_PRESETS = [
+      {
+        id: 'anbn',
+        name: 'L = { aⁿbⁿ | n ≥ 1 }',
+        description: 'Apila una marca "A" por cada "a" leída; al leer "b", desapila una "A" por cada "b". Acepta si se consume toda la cadena, n ≥ 1 y la pila vuelve a quedar con Z0.',
+        samples: [
+          { label: 'ab (Válida)', value: 'ab', valid: true },
+          { label: 'aaabbb (Válida)', value: 'aaabbb', valid: true },
+          { label: 'aabb (Válida)', value: 'aabb', valid: true },
+          { label: 'aab (Inválida)', value: 'aab', valid: false },
+          { label: 'ba (Inválida)', value: 'ba', valid: false },
+          { label: 'ε (Inválida)', value: '', valid: false },
+        ],
+        simulateStep: (ctx) => {
+          const chars = Array.from(ctx.input);
+          const top = ctx.stack[ctx.stack.length - 1];
+
+          // Fin de entrada
+          if (ctx.index >= chars.length) {
+            const ok = ctx.state === 'qMatch' && ctx.countA > 0 && ctx.countA === ctx.countB && top === 'Z0';
+            ctx.finished = true;
+            ctx.accepted = ok;
+            ctx.opText = ok
+              ? 'Entrada consumida y pila balanceada (tope Z0, n ≥ 1).'
+              : 'Entrada consumida pero el balance o conteo de a/b no coincide.';
+            ctx.logs.push(`[FIN] ${ok ? 'ACEPTADA' : 'RECHAZADA'}: ${ctx.opText}`);
+            return;
+          }
+
+          const sym = chars[ctx.index];
+          if (sym === 'a') {
+            if (ctx.state === 'qMatch' && ctx.countB > 0) {
+              // No permitimos 'a' después de haber iniciado la secuencia de 'b'
+              ctx.finished = true;
+              ctx.accepted = false;
+              ctx.opText = `Rechazo: símbolo 'a' inesperado tras leer 'b'.`;
+              ctx.logs.push(`[ERROR] ${ctx.opText}`);
+              return;
+            }
+            ctx.state = 'qPushA';
+            ctx.stack.push('A');
+            ctx.countA += 1;
+            ctx.index += 1;
+            ctx.opText = `PUSH 'A' (leído '${sym}'). Tope actual: '${ctx.stack[ctx.stack.length - 1]}'`;
+            ctx.logs.push(`Paso ${ctx.step}: qPushA, lee '${sym}' → PUSH A | Pila: [${ctx.stack.join(', ')}]`);
+          } else if (sym === 'b') {
+            if (top !== 'A') {
+              ctx.finished = true;
+              ctx.accepted = false;
+              ctx.opText = `POP fallido: se leyó 'b' pero el tope es '${top}' (no hay 'A' para emparejar).`;
+              ctx.logs.push(`[ERROR] ${ctx.opText}`);
+              return;
+            }
+            ctx.state = 'qMatch';
+            const popped = ctx.stack.pop();
+            ctx.countB += 1;
+            ctx.index += 1;
+            ctx.opText = `POP '${popped}' al leer '${sym}'. Tope actual: '${ctx.stack[ctx.stack.length - 1]}'`;
+            ctx.logs.push(`Paso ${ctx.step}: qMatch, lee '${sym}' → POP ${popped} | Pila: [${ctx.stack.join(', ')}]`);
+          } else {
+            ctx.finished = true;
+            ctx.accepted = false;
+            ctx.opText = `Símbolo '${sym}' fuera del alfabeto {a, b}.`;
+            ctx.logs.push(`[ERROR] ${ctx.opText}`);
+          }
+        }
+      },
+      {
+        id: 'parens',
+        name: 'Paréntesis Balanceados sobre { (, ) }',
+        description: 'Cada "(" hace PUSH "(" en la pila LIFO; cada ")" hace POP "(" si existe un paréntesis abierto en el tope. Requiere al menos un par y pila limpia (Z0) al final.',
+        samples: [
+          { label: '() (Válida)', value: '()', valid: true },
+          { label: '(())() (Válida)', value: '(())()', valid: true },
+          { label: '((())) (Válida)', value: '((()))', valid: true },
+          { label: '(() (Inválida)', value: '(()', valid: false },
+          { label: '())( (Inválida)', value: '())(', valid: false },
+          { label: 'ε (Inválida)', value: '', valid: false },
+        ],
+        simulateStep: (ctx) => {
+          const chars = Array.from(ctx.input);
+          const top = ctx.stack[ctx.stack.length - 1];
+
+          if (ctx.index >= chars.length) {
+            const ok = ctx.hasPairs && top === 'Z0' && ctx.stack.length === 1;
+            ctx.finished = true;
+            ctx.accepted = ok;
+            ctx.opText = ok
+              ? 'Todos los paréntesis fueron balanceados correctamente (pila en Z0).'
+              : 'Quedaron paréntesis sin cerrar o no hubo pares válidos.';
+            ctx.logs.push(`[FIN] ${ok ? 'ACEPTADA' : 'RECHAZADA'}: ${ctx.opText}`);
+            return;
+          }
+
+          const sym = chars[ctx.index];
+          if (sym === '(') {
+            ctx.state = 'qOpen';
+            ctx.stack.push('(');
+            ctx.index += 1;
+            ctx.opText = `PUSH '(' en la pila LIFO.`;
+            ctx.logs.push(`Paso ${ctx.step}: lee '(' → PUSH '(' | Pila: [${ctx.stack.join(', ')}]`);
+          } else if (sym === ')') {
+            if (top !== '(') {
+              ctx.finished = true;
+              ctx.accepted = false;
+              ctx.opText = `Error LIFO: se leyó ')' pero el tope es '${top}' (sin '(' abierto).`;
+              ctx.logs.push(`[ERROR] ${ctx.opText}`);
+              return;
+            }
+            ctx.state = 'qClose';
+            ctx.stack.pop();
+            ctx.hasPairs = true;
+            ctx.index += 1;
+            ctx.opText = `POP '(' al emparejar con ')'. Tope: '${ctx.stack[ctx.stack.length - 1]}'`;
+            ctx.logs.push(`Paso ${ctx.step}: lee ')' → POP '(' | Pila: [${ctx.stack.join(', ')}]`);
+          } else {
+            ctx.finished = true;
+            ctx.accepted = false;
+            ctx.opText = `Símbolo '${sym}' no válido en { (, ) }.`;
+            ctx.logs.push(`[ERROR] ${ctx.opText}`);
+          }
+        }
+      }
+    ];
+
+    const pdaState = {
+      preset: PDA_PRESETS[0],
+      input: 'aaabbb',
+      index: 0,
+      step: 0,
+      state: 'q0',
+      stack: ['Z0'],
+      countA: 0,
+      countB: 0,
+      hasPairs: false,
+      finished: false,
+      accepted: null,
+      opText: 'Pila inicializada con marcador de fondo Z0.',
+      logs: [],
+      timer: null
+    };
+
+    function renderPdaPresets() {
+      const container = document.getElementById('pda-presets-container');
+      container.innerHTML = '';
+      PDA_PRESETS.forEach(p => {
+        const active = pdaState.preset.id === p.id;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `w-full text-left p-3 rounded-xl border transition ${
+          active ? 'bg-teal-50 border-teal-400 text-teal-950' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800'
+        }`;
+        btn.innerHTML = `<div class="font-semibold text-xs sm:text-sm mono">${escapeHtml(p.name)}</div>`;
+        btn.addEventListener('click', () => {
+          stopAllTimers();
+          pdaState.preset = p;
+          if (p.samples.length > 0) {
+            pdaState.input = p.samples[0].value;
+            document.getElementById('pda-input-string').value = p.samples[0].value;
+          }
+          resetPdaSimulation();
+          renderPdaPresets();
+          renderPdaSamples();
+          showToast(`AP seleccionado: ${p.name}`, 'info');
+        });
+        container.appendChild(btn);
+      });
+
+      document.getElementById('pda-info-box').innerHTML = `
+        <div class="font-semibold text-teal-900">Regla del Lenguaje</div>
+        <p class="text-slate-700 leading-relaxed">${escapeHtml(pdaState.preset.description)}</p>
+      `;
+    }
+
+    function renderPdaSamples() {
+      const container = document.getElementById('pda-sample-strings');
+      container.innerHTML = '';
+      pdaState.preset.samples.forEach(s => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `px-2.5 py-1.5 rounded-lg border text-xs mono font-medium transition ${
+          s.valid
+            ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+            : 'bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-200'
+        }`;
+        btn.textContent = s.label;
+        btn.addEventListener('click', () => {
+          stopAllTimers();
+          pdaState.input = s.value;
+          document.getElementById('pda-input-string').value = s.value;
+          resetPdaSimulation();
+        });
+        container.appendChild(btn);
+      });
+    }
+
+    function resetPdaSimulation() {
+      if (pdaState.timer) { clearInterval(pdaState.timer); pdaState.timer = null; }
+      pdaState.index = 0;
+      pdaState.step = 0;
+      pdaState.state = 'q0';
+      pdaState.stack = ['Z0'];
+      pdaState.countA = 0;
+      pdaState.countB = 0;
+      pdaState.hasPairs = false;
+      pdaState.finished = false;
+      pdaState.accepted = null;
+      pdaState.opText = 'Pila inicializada con marcador de fondo Z0.';
+      pdaState.logs = [];
+      renderPdaView();
+      updatePlayButtonLabels();
+    }
+
+    function stepPda() {
+      if (pdaState.finished) {
+        stopAllTimers();
+        return;
+      }
+      pdaState.step += 1;
+      pdaState.preset.simulateStep(pdaState);
+
+      // Si al consumir el último símbolo aún no marcó finished, evaluamos en el siguiente paso o cerramos
+      const chars = Array.from(pdaState.input);
+      if (!pdaState.finished && pdaState.index >= chars.length) {
+        pdaState.step += 1;
+        pdaState.preset.simulateStep(pdaState);
+      }
+
+      if (pdaState.finished) {
+        stopAllTimers();
+      }
+      renderPdaView();
+    }
+
+    function runAllPda() {
+      stopAllTimers();
+      resetPdaSimulation();
+      let guard = 0;
+      while (!pdaState.finished && guard < 10000) {
+        stepPda();
+        guard++;
+      }
+    }
+
+    function renderPdaView() {
+      const chars = Array.from(pdaState.input);
+      const verdictEl = document.getElementById('pda-verdict-badge');
+      if (!pdaState.finished) {
+        verdictEl.className = 'px-3 py-1 rounded-full text-xs font-bold border bg-teal-50 text-teal-800 border-teal-200';
+        verdictEl.textContent = pdaState.step > 0 ? 'En ejecución LIFO...' : 'Listo para simular';
+      } else if (pdaState.accepted) {
+        verdictEl.className = 'px-3 py-1 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-300';
+        verdictEl.textContent = '✓ Cadena Aceptada';
+      } else {
+        verdictEl.className = 'px-3 py-1 rounded-full text-xs font-bold border bg-rose-50 text-rose-700 border-rose-300';
+        verdictEl.textContent = '✕ Cadena Rechazada';
+      }
+
+      document.getElementById('pda-step-counter').textContent = `Paso ${pdaState.step} · Símbolo ${Math.min(pdaState.index, chars.length)}/${chars.length}`;
+      document.getElementById('pda-state-display').textContent = pdaState.state;
+      document.getElementById('pda-stack-op').textContent = pdaState.opText;
+      document.getElementById('pda-top-symbol').textContent = pdaState.stack[pdaState.stack.length - 1] || '—';
+      document.getElementById('pda-stack-height').textContent = String(pdaState.stack.length);
+
+      // Cinta
+      const tapeEl = document.getElementById('pda-tape-view');
+      tapeEl.innerHTML = '';
+      if (chars.length === 0) {
+        tapeEl.innerHTML = `<span class="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-xs mono text-slate-600">ε (Cadena vacía)</span>`;
+      } else {
+        chars.forEach((ch, idx) => {
+          const div = document.createElement('div');
+          let cls = 'w-9 h-9 rounded-lg border flex items-center justify-center mono text-sm font-bold ';
+          if (idx < pdaState.index) {
+            cls += 'bg-slate-200 text-slate-400 border-slate-300';
+          } else if (idx === pdaState.index && !pdaState.finished) {
+            cls += 'bg-teal-600 text-white border-teal-700 shadow-sm scale-105';
+          } else {
+            cls += 'bg-white text-slate-800 border-slate-300';
+          }
+          div.className = cls;
+          div.textContent = ch;
+          tapeEl.appendChild(div);
+        });
+      }
+
+      // Pila LIFO visual (flex-col-reverse hace que el último elemento del array quede arriba)
+      const stackEl = document.getElementById('pda-stack-container');
+      stackEl.innerHTML = '';
+      pdaState.stack.forEach((item, idx) => {
+        const isTop = idx === pdaState.stack.length - 1;
+        const isBase = item === 'Z0';
+        const row = document.createElement('div');
+        row.className = `stack-item-enter px-3 py-2 rounded-lg mono text-xs font-bold flex items-center justify-between border ${
+          isTop
+            ? 'bg-teal-500 text-slate-950 border-teal-300 shadow-sm'
+            : isBase
+              ? 'bg-slate-800 text-amber-300 border-slate-700'
+              : 'bg-slate-800/90 text-slate-100 border-slate-700'
+        }`;
+        row.innerHTML = `
+          <span>${escapeHtml(item)}</span>
+          <span class="text-[10px] uppercase">${isTop ? '← TOP' : isBase ? 'BASE' : ''}</span>
+        `;
+        stackEl.appendChild(row);
+      });
+
+      const logEl = document.getElementById('pda-trace-log');
+      if (pdaState.logs.length === 0) {
+        logEl.innerHTML = '<div class="text-slate-400">// Sin pasos ejecutados aún.</div>';
+      } else {
+        logEl.innerHTML = pdaState.logs.map(l => `<div>${escapeHtml(l)}</div>`).join('');
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+    }
+
+    document.getElementById('pda-load-btn').addEventListener('click', () => {
+      stopAllTimers();
+      pdaState.input = document.getElementById('pda-input-string').value;
+      resetPdaSimulation();
+    });
+
+    document.getElementById('pda-step-btn').addEventListener('click', () => {
+      stopAllTimers();
+      stepPda();
+    });
+
+    document.getElementById('pda-play-btn').addEventListener('click', () => {
+      if (pdaState.timer) {
+        stopAllTimers();
+        return;
+      }
+      if (pdaState.finished) resetPdaSimulation();
+      const delay = Number(document.getElementById('pda-speed').value) || 650;
+      pdaState.timer = setInterval(() => {
+        if (pdaState.finished) stopAllTimers();
+        else stepPda();
+      }, delay);
+      updatePlayButtonLabels();
+    });
+
+    document.getElementById('pda-run-all-btn').addEventListener('click', runAllPda);
+    document.getElementById('pda-reset-btn').addEventListener('click', () => {
+      stopAllTimers();
+      resetPdaSimulation();
+    });
+
+    // =========================================================================
+    // NIVEL 1: AUTÓMATA LINEALMENTE ACOTADO (LBA) — CINTA ACOTADA [ ... ]
+    // =========================================================================
+    /**
+     * Simulador de LBA para { a^n b^n c^n | n >= 1 }:
+     * Marca secuencialmente una 'a' -> 'X', avanza buscando una 'b' -> 'Y',
+     * avanza buscando una 'c' -> 'Z', regresa a '[' y repite hasta verificar
+     * que todas las a, b, c quedaron marcadas con igual cantidad (n >= 1).
+     */
+    function buildAnBnCnSteps(inputStr) {
+      const steps = [];
+      const tape = ['[', ...Array.from(inputStr), ']'];
+      let head = 1;
+      let state = 'qStart';
+      let matchedGroups = 0;
+      let guard = 0;
+
+      const pushSnap = (detail, finished = false, accepted = null) => {
+        steps.push({
+          tape: [...tape],
+          head,
+          state,
+          detail,
+          finished,
+          accepted
+        });
+      };
+
+      pushSnap('Cinta delimitada por "[" y "]". Cabezal posicionado en el primer símbolo de entrada.');
+
+      if (inputStr.length === 0) {
+        pushSnap('RECHAZADA: la cadena vacía no pertenece a {aⁿbⁿcⁿ | n ≥ 1}.', true, false);
+        return steps;
+      }
+
+      while (guard < 4000) {
+        guard++;
+        const sym = tape[head];
+
+        if (state === 'qStart') {
+          if (sym === 'a') {
+            tape[head] = 'X';
+            state = 'qFindB';
+            head = Math.min(tape.length - 2, head + 1);
+            pushSnap(`Escribe 'X' marcando 'a' y mueve cabezal a la derecha (R) buscando 'b'.`);
+          } else if (sym === 'X') {
+            head = Math.min(tape.length - 2, head + 1);
+            pushSnap(`Salta 'X' ya marcado hacia la derecha (R).`);
+          } else if (sym === 'Y') {
+            // Ya no quedan 'a' sin marcar; verificamos que el resto sean solo 'Y' y 'Z' antes de ']'
+            state = 'qVerifyEnd';
+            pushSnap(`No hay más 'a' sin marcar. Verificando que el resto sean solo 'Y' y 'Z'.`);
+          } else {
+            pushSnap(`RECHAZADA: símbolo '${sym}' inesperado al iniciar ronda.`, true, false);
+            return steps;
+          }
+        } else if (state === 'qFindB') {
+          if (sym === 'a' || sym === 'X' || sym === 'Y') {
+            if (head >= tape.length - 2) {
+              pushSnap(`RECHAZADA: no se encontró 'b' antes de la frontera derecha ']'.`, true, false);
+              return steps;
+            }
+            head += 1;
+            pushSnap(`Avanza (R) sobre '${sym}' buscando 'b'.`);
+          } else if (sym === 'b') {
+            tape[head] = 'Y';
+            state = 'qFindC';
+            head = Math.min(tape.length - 2, head + 1);
+            pushSnap(`Marca 'b' como 'Y' y avanza (R) buscando 'c'.`);
+          } else {
+            pushSnap(`RECHAZADA: símbolo '${sym}' inválido mientras busca 'b'.`, true, false);
+            return steps;
+          }
+        } else if (state === 'qFindC') {
+          if (sym === 'b' || sym === 'Y' || sym === 'Z') {
+            if (head >= tape.length - 2) {
+              pushSnap(`RECHAZADA: no se encontró 'c' antes de la frontera derecha ']'.`, true, false);
+              return steps;
+            }
+            head += 1;
+            pushSnap(`Avanza (R) sobre '${sym}' buscando 'c'.`);
+          } else if (sym === 'c') {
+            tape[head] = 'Z';
+            matchedGroups += 1;
+            state = 'qReturnLeft';
+            head = Math.max(1, head - 1);
+            pushSnap(`Marca 'c' como 'Z' (grupo #${matchedGroups} completado) y retrocede (L) hacia '['.`);
+          } else {
+            pushSnap(`RECHAZADA: símbolo '${sym}' inválido mientras busca 'c'.`, true, false);
+            return steps;
+          }
+        } else if (state === 'qReturnLeft') {
+          if (head > 1) {
+            head -= 1;
+            pushSnap(`Retrocede (L) sobre '${tape[head + 1]}' hacia la frontera izquierda '['.`);
+          } else {
+            state = 'qStart';
+            pushSnap(`Alcanzó el inicio de la cinta acotada (junto a '['). Inicia nueva ronda.`);
+          }
+        } else if (state === 'qVerifyEnd') {
+          if (sym === 'Y' || sym === 'Z') {
+            if (head < tape.length - 2) {
+              head += 1;
+              pushSnap(`Verifica símbolo '${sym}' dentro de la cinta acotada (R).`);
+            } else {
+              const ok = matchedGroups >= 1;
+              state = ok ? 'qAccept' : 'qReject';
+              pushSnap(
+                ok
+                  ? `ACEPTADA: se emparejaron exactamente n = ${matchedGroups} grupos de (a, b, c) dentro de [ ... ].`
+                  : `RECHAZADA: se requiere n ≥ 1.`,
+                true,
+                ok
+              );
+              return steps;
+            }
+          } else {
+            pushSnap(`RECHAZADA: quedó '${sym}' sin emparejar en la cinta.`, true, false);
+            return steps;
+          }
+        }
+      }
+
+      pushSnap('Detenido por límite de pasos de seguridad.', true, false);
+      return steps;
+    }
+
+    /**
+     * Simulador de LBA para { w#w | w ∈ {a, b}+ }:
+     * Comprueba que haya exactamente un separador '#' y compara símbolo a símbolo
+     * marcando caracteres verificados con '✓'.
+     */
+    function buildWHashWSteps(inputStr) {
+      const steps = [];
+      const tape = ['[', ...Array.from(inputStr), ']'];
+      let head = 1;
+      let state = 'qScan';
+      let guard = 0;
+
+      const pushSnap = (detail, finished = false, accepted = null) => {
+        steps.push({ tape: [...tape], head, state, detail, finished, accepted });
+      };
+
+      pushSnap('Cinta acotada [ ... ] cargada para verificar formato w#w.');
+
+      const parts = inputStr.split('#');
+      if (parts.length !== 2 || parts[0].length === 0 || parts[0] !== parts[1]) {
+        // Simulamos un par de pasos visuales antes de concluir para que se aprecie el recorrido
+        if (inputStr.length > 0) {
+          pushSnap(`Analizando entrada "${inputStr}" en la cinta acotada...`);
+        }
+        pushSnap(
+          `RECHAZADA: la cadena no cumple w#w con w no vacío (partes: ${parts.length === 2 ? `'${parts[0]}' y '${parts[1]}'` : 'separador # inválido'}).`,
+          true,
+          false
+        );
+        return steps;
+      }
+
+      const wLen = parts[0].length;
+      const hashIdx = 1 + wLen;
+
+      for (let i = 0; i < wLen; i++) {
+        const leftPos = 1 + i;
+        const rightPos = hashIdx + 1 + i;
+        const symL = tape[leftPos];
+        const symR = tape[rightPos];
+
+        head = leftPos;
+        state = 'qReadLeft';
+        pushSnap(`Lee '${symL}' en posición ${leftPos} de la primera mitad w.`);
+
+        tape[leftPos] = '·';
+        head = rightPos;
+        state = 'qMatchRight';
+        pushSnap(`Marca posición ${leftPos} y se mueve hasta posición ${rightPos} para comparar con '${symR}'.`);
+
+        tape[rightPos] = '·';
+        state = 'qMatchedPair';
+        pushSnap(`Coincidencia confirmada ('${symL}' == '${symR}') en par ${i + 1}/${wLen}.`);
+      }
+
+      head = hashIdx;
+      state = 'qAccept';
+      pushSnap(`ACEPTADA: ambas mitades alrededor de '#' son idénticas (${parts[0]}#${parts[1]}) dentro de [ ... ].`, true, true);
+      return steps;
+    }
+
+    const LBA_PRESETS = [
+      {
+        id: 'anbncn',
+        name: 'L = { aⁿbⁿcⁿ | n ≥ 1 }',
+        description: 'Lenguaje sensible al contexto clásico (no libre de contexto). Marca cada a, b y c en orden dentro de los límites [ y ] hasta agotar n ≥ 1 repeticiones iguales.',
+        buildSteps: buildAnBnCnSteps,
+        samples: [
+          { label: 'abc (Válida)', value: 'abc', valid: true },
+          { label: 'aabbcc (Válida)', value: 'aabbcc', valid: true },
+          { label: 'aaabbbccc (Válida)', value: 'aaabbbccc', valid: true },
+          { label: 'aabcc (Inválida)', value: 'aabcc', valid: false },
+          { label: 'abcabc (Inválida)', value: 'abcabc', valid: false },
+          { label: 'ε (Inválida)', value: '', valid: false },
+        ]
+      },
+      {
+        id: 'whashw',
+        name: 'L = { w#w | w ∈ {a,b}⁺ }',
+        description: 'Verifica la duplicación exacta de una palabra w separada por "#" usando la cinta delimitada por [ y ] con movimiento bidireccional del cabezal.',
+        buildSteps: buildWHashWSteps,
+        samples: [
+          { label: 'a#a (Válida)', value: 'a#a', valid: true },
+          { label: 'ab#ab (Válida)', value: 'ab#ab', valid: true },
+          { label: 'bba#bba (Válida)', value: 'bba#bba', valid: true },
+          { label: 'ab#ba (Inválida)', value: 'ab#ba', valid: false },
+          { label: 'a#aa (Inválida)', value: 'a#aa', valid: false },
+        ]
+      }
+    ];
+
+    const lbaState = {
+      preset: LBA_PRESETS[0],
+      input: 'aabbcc',
+      steps: [],
+      stepIdx: 0,
+      logs: [],
+      timer: null
+    };
+
+    function renderLbaPresets() {
+      const container = document.getElementById('lba-presets-container');
+      container.innerHTML = '';
+      LBA_PRESETS.forEach(p => {
+        const active = lbaState.preset.id === p.id;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `w-full text-left p-3 rounded-xl border transition ${
+          active ? 'bg-amber-50 border-amber-400 text-amber-950' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800'
+        }`;
+        btn.innerHTML = `<div class="font-semibold text-xs sm:text-sm mono">${escapeHtml(p.name)}</div>`;
+        btn.addEventListener('click', () => {
+          stopAllTimers();
+          lbaState.preset = p;
+          if (p.samples.length > 0) {
+            lbaState.input = p.samples[0].value;
+            document.getElementById('lba-input-string').value = p.samples[0].value;
+          }
+          resetLbaSimulation();
+          renderLbaPresets();
+          renderLbaSamples();
+          showToast(`LBA seleccionado: ${p.name}`, 'info');
+        });
+        container.appendChild(btn);
+      });
+
+      document.getElementById('lba-info-box').innerHTML = `
+        <div class="font-semibold text-amber-900">Memoria Linealmente Acotada</div>
+        <p class="text-slate-700 leading-relaxed">${escapeHtml(lbaState.preset.description)}</p>
+      `;
+    }
+
+    function renderLbaSamples() {
+      const container = document.getElementById('lba-sample-strings');
+      container.innerHTML = '';
+      lbaState.preset.samples.forEach(s => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `px-2.5 py-1.5 rounded-lg border text-xs mono font-medium transition ${
+          s.valid
+            ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+            : 'bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-200'
+        }`;
+        btn.textContent = s.label;
+        btn.addEventListener('click', () => {
+          stopAllTimers();
+          lbaState.input = s.value;
+          document.getElementById('lba-input-string').value = s.value;
+          resetLbaSimulation();
+        });
+        container.appendChild(btn);
+      });
+    }
+
+    function resetLbaSimulation() {
+      if (lbaState.timer) { clearInterval(lbaState.timer); lbaState.timer = null; }
+      lbaState.steps = lbaState.preset.buildSteps(lbaState.input);
+      lbaState.stepIdx = 0;
+      lbaState.logs = lbaState.steps.length > 0 ? [`Paso 0 (${lbaState.steps[0].state}): ${lbaState.steps[0].detail}`] : [];
+      renderLbaView();
+      updatePlayButtonLabels();
+    }
+
+    function stepLba() {
+      const current = lbaState.steps[lbaState.stepIdx];
+      if (!current || current.finished || lbaState.stepIdx >= lbaState.steps.length - 1) {
+        stopAllTimers();
+        renderLbaView();
+        return;
+      }
+      lbaState.stepIdx += 1;
+      const snap = lbaState.steps[lbaState.stepIdx];
+      lbaState.logs.push(`Paso ${lbaState.stepIdx} (${snap.state} · pos ${snap.head}): ${snap.detail}`);
+      if (snap.finished) {
+        stopAllTimers();
+      }
+      renderLbaView();
+    }
+
+    function runAllLba() {
+      stopAllTimers();
+      resetLbaSimulation();
+      lbaState.stepIdx = Math.max(0, lbaState.steps.length - 1);
+      lbaState.logs = lbaState.steps.map((s, idx) => `Paso ${idx} (${s.state} · pos ${s.head}): ${s.detail}`);
+      renderLbaView();
+    }
+
+    function renderLbaView() {
+      const snap = lbaState.steps[lbaState.stepIdx] || {
+        tape: ['[', ']'],
+        head: 0,
+        state: '—',
+        detail: 'Sin datos',
+        finished: false,
+        accepted: null
+      };
+
+      const verdictEl = document.getElementById('lba-verdict-badge');
+      if (!snap.finished) {
+        verdictEl.className = 'px-3 py-1 rounded-full text-xs font-bold border bg-amber-50 text-amber-800 border-amber-200';
+        verdictEl.textContent = lbaState.stepIdx > 0 ? 'Recorriendo cinta...' : 'Listo para simular';
+      } else if (snap.accepted) {
+        verdictEl.className = 'px-3 py-1 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-300';
+        verdictEl.textContent = '✓ Cadena Aceptada';
+      } else {
+        verdictEl.className = 'px-3 py-1 rounded-full text-xs font-bold border bg-rose-50 text-rose-700 border-rose-300';
+        verdictEl.textContent = '✕ Cadena Rechazada';
+      }
+
+      document.getElementById('lba-status-meta').textContent =
+        `Paso ${lbaState.stepIdx}/${Math.max(0, lbaState.steps.length - 1)} · Estado: ${snap.state} · Pos: ${snap.head}`;
+
+      const tapeEl = document.getElementById('lba-tape-view');
+      tapeEl.innerHTML = '';
+
+      snap.tape.forEach((cellVal, idx) => {
+        const isLeftBound = idx === 0;
+        const isRightBound = idx === snap.tape.length - 1;
+        const isHead = idx === snap.head;
+
+        const col = document.createElement('div');
+        col.className = 'flex flex-col items-center shrink-0';
+
+        const pointer = document.createElement('div');
+        pointer.className = `h-4 text-[11px] font-bold mono leading-none ${isHead ? 'text-sky-300 tape-head-bob' : 'text-transparent'}`;
+        pointer.textContent = '▼';
+
+        const box = document.createElement('div');
+        let boxCls = 'tape-cell w-10 h-10 rounded-lg border flex items-center justify-center mono text-sm font-bold ';
+        if (isLeftBound || isRightBound) {
+          boxCls += 'bg-amber-500/20 text-amber-300 border-amber-400';
+        } else if (isHead) {
+          boxCls += 'bg-sky-500 text-slate-950 border-sky-300 ring-2 ring-sky-300/60';
+        } else if (['X', 'Y', 'Z', '·'].includes(cellVal)) {
+          boxCls += 'bg-slate-800 text-emerald-300 border-slate-600';
+        } else {
+          boxCls += 'bg-slate-800 text-white border-slate-700';
+        }
+        box.className = boxCls;
+        box.textContent = cellVal;
+
+        const idxLabel = document.createElement('span');
+        idxLabel.className = 'text-[10px] mono text-slate-500 mt-1';
+        idxLabel.textContent = isLeftBound ? 'L-BND' : isRightBound ? 'R-BND' : String(idx);
+
+        col.appendChild(pointer);
+        col.appendChild(box);
+        col.appendChild(idxLabel);
+        tapeEl.appendChild(col);
+      });
+
+      document.getElementById('lba-step-detail').textContent = snap.detail;
+
+      const logEl = document.getElementById('lba-trace-log');
+      logEl.innerHTML = lbaState.logs.map(l => `<div>${escapeHtml(l)}</div>`).join('');
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    document.getElementById('lba-load-btn').addEventListener('click', () => {
+      stopAllTimers();
+      lbaState.input = document.getElementById('lba-input-string').value;
+      resetLbaSimulation();
+    });
+
+    document.getElementById('lba-step-btn').addEventListener('click', () => {
+      stopAllTimers();
+      stepLba();
+    });
+
+    document.getElementById('lba-play-btn').addEventListener('click', () => {
+      if (lbaState.timer) {
+        stopAllTimers();
+        return;
+      }
+      const current = lbaState.steps[lbaState.stepIdx];
+      if (current && current.finished) resetLbaSimulation();
+      const delay = Number(document.getElementById('lba-speed').value) || 420;
+      lbaState.timer = setInterval(() => {
+        const cur = lbaState.steps[lbaState.stepIdx];
+        if (!cur || cur.finished) stopAllTimers();
+        else stepLba();
+      }, delay);
+      updatePlayButtonLabels();
+    });
+
+    document.getElementById('lba-run-all-btn').addEventListener('click', runAllLba);
+    document.getElementById('lba-reset-btn').addEventListener('click', () => {
+      stopAllTimers();
+      resetLbaSimulation();
+    });
+
+    // =========================================================================
+    // NIVEL 0: MÁQUINA DE TURING (MT) — ACEPTACIÓN Y FUNCIÓN ARITMÉTICA
+    // =========================================================================
+    /**
+     * Crea una cinta extendible dinámica (índice relativo al inicio de la entrada)
+     * con símbolo en blanco '⊔'.
+     */
+    function createDynamicTape(inputStr) {
+      const cells = {};
+      const chars = Array.from(inputStr);
+      for (let i = 0; i < chars.length; i++) {
+        cells[i] = chars[i];
+      }
+      return {
+        cells,
+        head: 0,
+        minIdx: Math.min(0, -2),
+        maxIdx: Math.max(chars.length + 2, 4),
+        read() {
+          return this.cells[this.head] ?? '⊔';
+        },
+        write(sym) {
+          if (sym === '⊔') {
+            delete this.cells[this.head];
+          } else {
+            this.cells[this.head] = sym;
+          }
+          this.minIdx = Math.min(this.minIdx, this.head - 1);
+          this.maxIdx = Math.max(this.maxIdx, this.head + 1);
+        },
+        move(dir) {
+          if (dir === 'R') this.head += 1;
+          else if (dir === 'L') this.head -= 1;
+          this.minIdx = Math.min(this.minIdx, this.head - 1);
+          this.maxIdx = Math.max(this.maxIdx, this.head + 1);
+        },
+        snapshotArray() {
+          const arr = [];
+          for (let i = this.minIdx; i <= this.maxIdx; i++) {
+            arr.push({ idx: i, val: this.cells[i] ?? '⊔' });
+          }
+          return arr;
+        },
+        compactNonBlanks() {
+          const keys = Object.keys(this.cells).map(Number).sort((a, b) => a - b);
+          if (keys.length === 0) return '⊔';
+          let out = '';
+          for (let i = keys[0]; i <= keys[keys.length - 1]; i++) {
+            out += this.cells[i] ?? '⊔';
+          }
+          return out;
+        }
+      };
+    }
+
+    /**
+     * MT 1 (Función Aritmética): Suma Unaria de dos números en unario separados por '+'.
+     * Ejemplo: "111+11" (3 + 2) -> reemplaza '+' por '1' y borra el último '1' -> "11111" (5).
+     */
+    function buildUnarySumMachine(inputStr) {
+      const tape = createDynamicTape(inputStr);
+      let state = 'qScanPlus';
+      let steps = 0;
+      let halted = false;
+      let accepted = null;
+      let summary = 'Listo para ejecutar suma unaria (formato: 1...1+1...1).';
+
+      // Validación previa sencilla de formato a+b con a>=0, b>=1
+      const validFormat = /^[1]*\+[1]+$/.test(inputStr);
+
+      function step() {
+        if (halted) return;
+        steps += 1;
+        const sym = tape.read();
+
+        if (!validFormat) {
+          halted = true;
+          accepted = false;
+          summary = `Entrada "${inputStr}" no sigue el formato unario esperado (ej. 111+11).`;
+          return { halted, accepted, summary, rule: 'Validación de formato' };
+        }
+
+        if (state === 'qScanPlus') {
+          if (sym === '1') {
+            tape.move('R');
+            return { halted, accepted, summary, rule: `δ(qScanPlus, 1) → (qScanPlus, 1, R)` };
+          } else if (sym === '+') {
+            // Convertimos '+' en '1' y avanzamos hasta el final de los unos para borrar uno
+            tape.write('1');
+            state = 'qGoEnd';
+            tape.move('R');
+            return { halted, accepted, summary, rule: `δ(qScanPlus, +) → (qGoEnd, 1, R)` };
+          }
+        } else if (state === 'qGoEnd') {
+          if (sym === '1') {
+            tape.move('R');
+            return { halted, accepted, summary, rule: `δ(qGoEnd, 1) → (qGoEnd, 1, R)` };
+          } else if (sym === '⊔') {
+            state = 'qEraseLast';
+            tape.move('L');
+            return { halted, accepted, summary, rule: `δ(qGoEnd, ⊔) → (qEraseLast, ⊔, L)` };
+          }
+        } else if (state === 'qEraseLast') {
+          if (sym === '1') {
+            tape.write('⊔');
+            state = 'qRewind';
+            tape.move('L');
+            return { halted, accepted, summary, rule: `δ(qEraseLast, 1) → (qRewind, ⊔, L)` };
+          }
+        } else if (state === 'qRewind') {
+          if (sym === '1') {
+            tape.move('L');
+            return { halted, accepted, summary, rule: `δ(qRewind, 1) → (qRewind, 1, L)` };
+          } else {
+            tape.move('R');
+            state = 'qHalt';
+            halted = true;
+            accepted = true;
+            const resStr = tape.compactNonBlanks();
+            summary = `Suma completada en ${steps} pasos. Resultado unario: "${resStr}" (valor decimal = ${resStr.length}).`;
+            return { halted, accepted, summary, rule: `δ(qRewind, ${sym}) → (qHalt, ${sym}, R)` };
+          }
+        }
+
+        halted = true;
+        accepted = false;
+        summary = 'Detenido por transición no definida.';
+        return { halted, accepted, summary, rule: 'Alto' };
+      }
+
+      return {
+        tape,
+        getState: () => state,
+        getSteps: () => steps,
+        step
+      };
+    }
+
+    /**
+     * MT 2 (Función Aritmética): Incremento Binario (+1) sobre número binario.
+     * Ejemplo: "1011" (11) -> "1100" (12).
+     */
+    function buildBinaryIncrementMachine(inputStr) {
+      const tape = createDynamicTape(inputStr);
+      let state = 'qGoRight';
+      let steps = 0;
+      let halted = false;
+      let accepted = null;
+      let summary = 'Listo para incrementar número binario (+1).';
+
+      const validBin = /^[01]+$/.test(inputStr);
+
+      function step() {
+        if (halted) return;
+        steps += 1;
+        const sym = tape.read();
+
+        if (!validBin) {
+          halted = true;
+          accepted = false;
+          summary = `Entrada "${inputStr}" inválida: se requiere un número binario no vacío (0 y 1).`;
+          return { halted, accepted, summary, rule: 'Error de entrada' };
+        }
+
+        if (state === 'qGoRight') {
+          if (sym === '0' || sym === '1') {
+            tape.move('R');
+            return { halted, accepted, summary, rule: `δ(qGoRight, ${sym}) → (qGoRight, ${sym}, R)` };
+          } else if (sym === '⊔') {
+            state = 'qCarry';
+            tape.move('L');
+            return { halted, accepted, summary, rule: `δ(qGoRight, ⊔) → (qCarry, ⊔, L)` };
+          }
+        } else if (state === 'qCarry') {
+          if (sym === '0') {
+            tape.write('1');
+            state = 'qDone';
+            halted = true;
+            accepted = true;
+            const res = tape.compactNonBlanks();
+            summary = `Incremento (+1) finalizado en ${steps} pasos. Resultado binario: ${res} (decimal: ${parseInt(res, 2)}).`;
+            return { halted, accepted, summary, rule: `δ(qCarry, 0) → (qDone, 1, S)` };
+          } else if (sym === '1') {
+            tape.write('0');
+            tape.move('L');
+            return { halted, accepted, summary, rule: `δ(qCarry, 1) → (qCarry, 0, L)` };
+          } else if (sym === '⊔') {
+            // Todos eran '1': escribimos '1' en el blanco izquierdo
+            tape.write('1');
+            state = 'qDone';
+            halted = true;
+            accepted = true;
+            const res = tape.compactNonBlanks();
+            summary = `Acarreo propagado hasta blanco: resultado binario ${res} (decimal: ${parseInt(res, 2)}).`;
+            return { halted, accepted, summary, rule: `δ(qCarry, ⊔) → (qDone, 1, S)` };
+          }
+        }
+
+        halted = true;
+        accepted = false;
+        summary = 'Detenido.';
+        return { halted, accepted, summary, rule: 'Alto' };
+      }
+
+      return {
+        tape,
+        getState: () => state,
+        getSteps: () => steps,
+        step
+      };
+    }
+
+    /**
+     * MT 3 (Aceptación de Lenguaje): Reconoce { 0^n 1^n | n >= 1 } marcando 0->X y 1->Y.
+     */
+    function buildZeroNOneNMachine(inputStr) {
+      const tape = createDynamicTape(inputStr);
+      let state = 'qFind0';
+      let steps = 0;
+      let halted = false;
+      let accepted = null;
+      let pairs = 0;
+      let summary = 'Listo para reconocer {0ⁿ1ⁿ | n ≥ 1} en la cinta.';
+
+      function step() {
+        if (halted) return;
+        steps += 1;
+        const sym = tape.read();
+
+        if (!/^[01]*$/.test(inputStr) || inputStr.length === 0) {
+          halted = true;
+          accepted = false;
+          summary = `RECHAZADA: se requiere una cadena no vacía sobre {0, 1}.`;
+          return { halted, accepted, summary, rule: 'Rechazo inmediato' };
+        }
+
+        if (state === 'qFind0') {
+          if (sym === '0') {
+            tape.write('X');
+            state = 'qFind1';
+            tape.move('R');
+            return { halted, accepted, summary, rule: `δ(qFind0, 0) → (qFind1, X, R)` };
+          } else if (sym === 'X') {
+            tape.move('R');
+            return { halted, accepted, summary, rule: `δ(qFind0, X) → (qFind0, X, R)` };
+          } else if (sym === 'Y') {
+            state = 'qCheckAllY';
+            tape.move('R');
+            return { halted, accepted, summary, rule: `δ(qFind0, Y) → (qCheckAllY, Y, R)` };
+          } else {
+            halted = true;
+            accepted = false;
+            summary = `RECHAZADA en paso ${steps}: símbolo '${sym}' inesperado.`;
+            return { halted, accepted, summary, rule: 'Rechazo' };
+          }
+        } else if (state === 'qFind1') {
+          if (sym === '0' || sym === 'Y') {
+            tape.move('R');
+            return { halted, accepted, summary, rule: `δ(qFind1, ${sym}) → (qFind1, ${sym}, R)` };
+          } else if (sym === '1') {
+            tape.write('Y');
+            pairs += 1;
+            state = 'qGoStart';
+            tape.move('L');
+            return { halted, accepted, summary, rule: `δ(qFind1, 1) → (qGoStart, Y, L)` };
+          } else {
+            halted = true;
+            accepted = false;
+            summary = `RECHAZADA: faltó un '1' para emparejar un '0'.`;
+            return { halted, accepted, summary, rule: 'Rechazo' };
+          }
+        } else if (state === 'qGoStart') {
+          if (sym === '0' || sym === '1' || sym === 'X' || sym === 'Y') {
+            tape.move('L');
+            return { halted, accepted, summary, rule: `δ(qGoStart, ${sym}) → (qGoStart, ${sym}, L)` };
+          } else if (sym === '⊔') {
+            state = 'qFind0';
+            tape.move('R');
+            return { halted, accepted, summary, rule: `δ(qGoStart, ⊔) → (qFind0, ⊔, R)` };
+          }
+        } else if (state === 'qCheckAllY') {
+          if (sym === 'Y') {
+            tape.move('R');
+            return { halted, accepted, summary, rule: `δ(qCheckAllY, Y) → (qCheckAllY, Y, R)` };
+          } else if (sym === '⊔') {
+            const ok = pairs >= 1;
+            state = ok ? 'qAccept' : 'qReject';
+            halted = true;
+            accepted = ok;
+            summary = ok
+              ? `ACEPTADA en ${steps} pasos: se verificaron exactamente n = ${pairs} ceros y n = ${pairs} unos.`
+              : `RECHAZADA: n debe ser al menos 1.`;
+            return { halted, accepted, summary, rule: `δ(qCheckAllY, ⊔) → (${state}, ⊔, S)` };
+          } else {
+            halted = true;
+            accepted = false;
+            summary = `RECHAZADA: quedó '${sym}' sin emparejar tras los 'Y'.`;
+            return { halted, accepted, summary, rule: 'Rechazo' };
+          }
+        }
+
+        halted = true;
+        accepted = false;
+        summary = 'Detenido.';
+        return { halted, accepted, summary, rule: 'Alto' };
+      }
+
+      return {
+        tape,
+        getState: () => state,
+        getSteps: () => steps,
+        step
+      };
+    }
+
+    const TM_PRESETS = [
+      {
+        id: 'unary-add',
+        name: 'Función Aritmética: Suma Unaria (a + b)',
+        tapeAlphabet: 'Γ = { 1, +, ⊔ }',
+        description: 'Calcula la suma unaria de dos operandos separados por "+" (ej. 111+11 = 3+2 → 11111 = 5).',
+        buildMachine: buildUnarySumMachine,
+        samples: [
+          { label: '11+1 (2+1=3)', value: '11+1', valid: true },
+          { label: '111+11 (3+2=5)', value: '111+11', valid: true },
+          { label: '+11 (0+2=2)', value: '+11', valid: true },
+          { label: '111 (Inválida)', value: '111', valid: false },
+        ]
+      },
+      {
+        id: 'bin-inc',
+        name: 'Función Aritmética: Incremento Binario (+1)',
+        tapeAlphabet: 'Γ = { 0, 1, ⊔ }',
+        description: 'Desplaza el cabezal al extremo derecho del número binario y propaga el acarreo (+1) hacia la izquierda.',
+        buildMachine: buildBinaryIncrementMachine,
+        samples: [
+          { label: '1011 (11→12)', value: '1011', valid: true },
+          { label: '0111 (7→8)', value: '0111', valid: true },
+          { label: '111 (7→8)', value: '111', valid: true },
+          { label: '102 (Inválida)', value: '102', valid: false },
+        ]
+      },
+      {
+        id: 'lang-0n1n',
+        name: 'Aceptación de Lenguaje: { 0ⁿ1ⁿ | n ≥ 1 }',
+        tapeAlphabet: 'Γ = { 0, 1, X, Y, ⊔ }',
+        description: 'Marca cada "0" con "X" y su correspondiente "1" con "Y" sobre la cinta bidireccional hasta aceptar o rechazar.',
+        buildMachine: buildZeroNOneNMachine,
+        samples: [
+          { label: '01 (Válida)', value: '01', valid: true },
+          { label: '0011 (Válida)', value: '0011', valid: true },
+          { label: '000111 (Válida)', value: '000111', valid: true },
+          { label: '001 (Inválida)', value: '001', valid: false },
+          { label: '0101 (Inválida)', value: '0101', valid: false },
+        ]
+      }
+    ];
+
+    const tmState = {
+      preset: TM_PRESETS[0],
+      input: '111+11',
+      machine: null,
+      halted: false,
+      accepted: null,
+      lastRule: 'Esperando ejecución...',
+      summary: '',
+      logs: [],
+      timer: null
+    };
+
+    function renderTmPresets() {
+      const container = document.getElementById('tm-presets-container');
+      container.innerHTML = '';
+      TM_PRESETS.forEach(p => {
+        const active = tmState.preset.id === p.id;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `w-full text-left p-3 rounded-xl border transition ${
+          active ? 'bg-rose-50 border-rose-400 text-rose-950' : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800'
+        }`;
+        btn.innerHTML = `<div class="font-semibold text-xs sm:text-sm">${escapeHtml(p.name)}</div>`;
+        btn.addEventListener('click', () => {
+          stopAllTimers();
+          tmState.preset = p;
+          if (p.samples.length > 0) {
+            tmState.input = p.samples[0].value;
+            document.getElementById('tm-input-string').value = p.samples[0].value;
+          }
+          resetTmSimulation();
+          renderTmPresets();
+          renderTmSamples();
+          showToast(`MT cargada: ${p.name}`, 'info');
+        });
+        container.appendChild(btn);
+      });
+
+      document.getElementById('tm-info-box').innerHTML = `
+        <div class="font-semibold text-rose-900">Especificación de la Máquina</div>
+        <p class="text-slate-700 leading-relaxed">${escapeHtml(tmState.preset.description)}</p>
+      `;
+    }
+
+    function renderTmSamples() {
+      const container = document.getElementById('tm-sample-strings');
+      container.innerHTML = '';
+      tmState.preset.samples.forEach(s => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `px-2.5 py-1.5 rounded-lg border text-xs mono font-medium transition ${
+          s.valid
+            ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+            : 'bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-200'
+        }`;
+        btn.textContent = s.label;
+        btn.addEventListener('click', () => {
+          stopAllTimers();
+          tmState.input = s.value;
+          document.getElementById('tm-input-string').value = s.value;
+          resetTmSimulation();
+        });
+        container.appendChild(btn);
+      });
+    }
+
+    function resetTmSimulation() {
+      if (tmState.timer) { clearInterval(tmState.timer); tmState.timer = null; }
+      tmState.machine = tmState.preset.buildMachine(tmState.input);
+      tmState.halted = false;
+      tmState.accepted = null;
+      tmState.lastRule = 'Cinta inicializada. Lista para ejecutar.';
+      tmState.summary = `Entrada cargada: "${tmState.input || '⊔'}". Cabezal en posición 0.`;
+      tmState.logs = [];
+      renderTmView();
+      updatePlayButtonLabels();
+    }
+
+    function stepTm() {
+      if (!tmState.machine || tmState.halted) {
+        stopAllTimers();
+        return;
+      }
+
+      const prevState = tmState.machine.getState();
+      const prevHead = tmState.machine.tape.head;
+      const prevRead = tmState.machine.tape.read();
+
+      const res = tmState.machine.step();
+      tmState.halted = Boolean(res.halted);
+      tmState.accepted = res.accepted;
+      tmState.summary = res.summary;
+      tmState.lastRule = res.rule;
+
+      tmState.logs.push(
+        `Paso ${tmState.machine.getSteps()}: [${prevState}, pos=${prevHead}, lee='${prevRead}'] → ${res.rule} | estado=${tmState.machine.getState()}, pos=${tmState.machine.tape.head}`
+      );
+
+      if (tmState.halted) {
+        tmState.logs.push(`[ALTO] ${res.summary}`);
+        stopAllTimers();
+      }
+      renderTmView();
+    }
+
+    function runAllTm() {
+      stopAllTimers();
+      resetTmSimulation();
+      let guard = 0;
+      while (!tmState.halted && guard < 10000) {
+        stepTm();
+        guard++;
+      }
+    }
+
+    function renderTmView() {
+      const m = tmState.machine;
+      const verdictEl = document.getElementById('tm-verdict-badge');
+      if (!tmState.halted) {
+        verdictEl.className = 'px-3 py-1 rounded-full text-xs font-bold border bg-rose-50 text-rose-800 border-rose-200';
+        verdictEl.textContent = m.getSteps() > 0 ? 'Ejecutando...' : 'Listo para ejecutar';
+      } else if (tmState.accepted) {
+        verdictEl.className = 'px-3 py-1 rounded-full text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-300';
+        verdictEl.textContent = '✓ Completado / Aceptado';
+      } else {
+        verdictEl.className = 'px-3 py-1 rounded-full text-xs font-bold border bg-rose-50 text-rose-700 border-rose-300';
+        verdictEl.textContent = '✕ Detenido / Rechazado';
+      }
+
+      document.getElementById('tm-active-state').textContent = m.getState();
+      document.getElementById('tm-step-count').textContent = String(m.getSteps());
+      document.getElementById('tm-head-pos').textContent = String(m.tape.head);
+      document.getElementById('tm-tape-alphabet').textContent = tmState.preset.tapeAlphabet;
+      document.getElementById('tm-read-write-indicator').textContent =
+        `Símbolo bajo cabezal: '${m.tape.read()}' · ${tmState.lastRule}`;
+
+      const tapeEl = document.getElementById('tm-tape-view');
+      tapeEl.innerHTML = '';
+      const snap = m.tape.snapshotArray();
+
+      snap.forEach(item => {
+        const isHead = item.idx === m.tape.head;
+        const isBlank = item.val === '⊔';
+
+        const col = document.createElement('div');
+        col.className = 'flex flex-col items-center shrink-0';
+
+        const pointer = document.createElement('div');
+        pointer.className = `h-4 text-[11px] font-bold mono leading-none ${isHead ? 'text-rose-400 tape-head-bob' : 'text-transparent'}`;
+        pointer.textContent = '▼';
+
+        const box = document.createElement('div');
+        let boxCls = 'tape-cell w-10 h-10 rounded-lg border flex items-center justify-center mono text-sm font-bold ';
+        if (isHead) {
+          boxCls += 'bg-rose-500 text-white border-rose-300 ring-2 ring-rose-300/60';
+        } else if (isBlank) {
+          boxCls += 'bg-slate-950 text-slate-500 border-slate-800 border-dashed';
+        } else {
+          boxCls += 'bg-slate-800 text-white border-slate-600';
+        }
+        box.className = boxCls;
+        box.textContent = item.val;
+
+        const idxLbl = document.createElement('span');
+        idxLbl.className = 'text-[10px] mono text-slate-500 mt-1';
+        idxLbl.textContent = String(item.idx);
+
+        col.appendChild(pointer);
+        col.appendChild(box);
+        col.appendChild(idxLbl);
+        tapeEl.appendChild(col);
+      });
+
+      document.getElementById('tm-output-summary').textContent = tmState.summary;
+
+      const logEl = document.getElementById('tm-trace-log');
+      if (tmState.logs.length === 0) {
+        logEl.innerHTML = '<div class="text-slate-400">// Sin pasos ejecutados aún.</div>';
+      } else {
+        logEl.innerHTML = tmState.logs.map(l => `<div>${escapeHtml(l)}</div>`).join('');
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+    }
+
+    document.getElementById('tm-load-btn').addEventListener('click', () => {
+      stopAllTimers();
+      tmState.input = document.getElementById('tm-input-string').value;
+      resetTmSimulation();
+    });
+
+    document.getElementById('tm-step-btn').addEventListener('click', () => {
+      stopAllTimers();
+      stepTm();
+    });
+
+    document.getElementById('tm-play-btn').addEventListener('click', () => {
+      if (tmState.timer) {
+        stopAllTimers();
+        return;
+      }
+      if (tmState.halted) resetTmSimulation();
+      const delay = Number(document.getElementById('tm-speed').value) || 320;
+      tmState.timer = setInterval(() => {
+        if (tmState.halted) stopAllTimers();
+        else stepTm();
+      }, delay);
+      updatePlayButtonLabels();
+    });
+
+    document.getElementById('tm-run-all-btn').addEventListener('click', runAllTm);
+    document.getElementById('tm-reset-btn').addEventListener('click', () => {
+      stopAllTimers();
+      resetTmSimulation();
+    });
+
+    function updatePlayButtonLabels() {
+      document.getElementById('dfa-play-btn').textContent = dfaState.timer ? 'Pausar' : 'Reproducir';
+      document.getElementById('pda-play-btn').textContent = pdaState.timer ? 'Pausar' : 'Reproducir';
+      document.getElementById('lba-play-btn').textContent = lbaState.timer ? 'Pausar' : 'Reproducir';
+      document.getElementById('tm-play-btn').textContent = tmState.timer ? 'Pausar' : 'Reproducir';
+    }
+
+    // =========================================================================
+    // INICIALIZACIÓN GENERAL DE LA APLICACIÓN
+    // =========================================================================
+    function initApp() {
+      // Nivel 3
+      syncDfaEditorInputs();
+      renderDfaPresets();
+      renderDfaSamples();
+      document.getElementById('dfa-input-string').value = dfaState.input;
+      resetDfaSimulation();
+
+      // Nivel 2
+      renderPdaPresets();
+      renderPdaSamples();
+      document.getElementById('pda-input-string').value = pdaState.input;
+      resetPdaSimulation();
+
+      // Nivel 1
+      renderLbaPresets();
+      renderLbaSamples();
+      document.getElementById('lba-input-string').value = lbaState.input;
+      resetLbaSimulation();
+
+      // Nivel 0
+      renderTmPresets();
+      renderTmSamples();
+      document.getElementById('tm-input-string').value = tmState.input;
+      resetTmSimulation();
+
+      // Vista inicial en Nivel 3
+      switchLevel(3);
+    }
+
+    window.addEventListener('DOMContentLoaded', initApp);
+  </script>
+</body>
+</html>
